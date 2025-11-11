@@ -1,0 +1,45 @@
+# CDK
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+dist
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+# Lambda build artifacts
+lambda/dist
+lambda/node_modules
+
+# Configuration files with secrets
+config/domains.json
+!config/domains.example.json
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Test coverage
+coverage
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+.cache

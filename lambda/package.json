@@ -1,0 +1,30 @@
+{
+  "name": "acme-to-acm-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function for ACME certificate renewal and ACM import",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "acme",
+    "certbot",
+    "lambda",
+    "acm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-acm": "^3.713.0",
+    "@aws-sdk/client-s3": "^3.713.0",
+    "@aws-sdk/client-sns": "^3.713.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.7.2"
+  }
+}

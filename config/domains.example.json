@@ -1,0 +1,70 @@
+{
+  "version": "1.0",
+  "defaults": {
+    "email": "admin@example.com",
+    "acmeProvider": "jprs",
+    "renewDaysBeforeExpiry": 30
+  },
+  "certificates": [
+    {
+      "id": "example-com-wildcard",
+      "domains": [
+        "example.com",
+        "*.example.com"
+      ],
+      "email": "admin@example.com",
+      "acmeProvider": "jprs",
+      "acmeServerUrl": "https://acme.jprs.jp/directory",
+      "route53HostedZoneId": "Z1234567890ABC",
+      "acmCertificateArn": null,
+      "renewDaysBeforeExpiry": 30,
+      "enabled": true,
+      "keyType": "rsa",
+      "rsaKeySize": 2048
+    },
+    {
+      "id": "another-domain",
+      "domains": [
+        "another.example.jp"
+      ],
+      "email": "certificates@example.jp",
+      "acmeProvider": "jprs",
+      "acmeServerUrl": "https://acme.jprs.jp/directory",
+      "route53HostedZoneId": "ZANOTHERZONE123",
+      "acmCertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/existing-cert-id",
+      "renewDaysBeforeExpiry": 30,
+      "enabled": true,
+      "keyType": "rsa",
+      "rsaKeySize": 4096
+    },
+    {
+      "id": "letsencrypt-example",
+      "domains": [
+        "test.example.org",
+        "*.test.example.org"
+      ],
+      "email": "webmaster@example.org",
+      "acmeProvider": "letsencrypt",
+      "route53HostedZoneId": "ZLETSENCRYPT456",
+      "acmCertificateArn": null,
+      "renewDaysBeforeExpiry": 30,
+      "enabled": false,
+      "keyType": "ecdsa"
+    },
+    {
+      "id": "custom-acme-provider",
+      "domains": [
+        "custom.example.net"
+      ],
+      "email": "admin@example.net",
+      "acmeProvider": "custom",
+      "acmeServerUrl": "https://acme.custom-provider.example/directory",
+      "route53HostedZoneId": "ZCUSTOM789",
+      "acmCertificateArn": null,
+      "renewDaysBeforeExpiry": 30,
+      "enabled": false,
+      "keyType": "rsa",
+      "rsaKeySize": 2048
+    }
+  ]
+}
