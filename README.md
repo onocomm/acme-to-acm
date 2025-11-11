@@ -84,85 +84,38 @@ acme-to-acm/
 ### 1. 依存関係のインストール
 
 ```bash
-# ルートプロジェクト
+# ルートでインストール（lambda/ ディレクトリも自動的にインストールされます）
 npm install
-
-# Lambda プロジェクト
-cd lambda
-npm install
-cd ..
 ```
 
-### 2. ドメイン設定ファイルの作成
-
-```bash
-# サンプルをコピーして編集
-cp config/domains.example.json config/domains.json
-```
-
-`config/domains.json` を編集して、管理するドメインを設定します：
-
-```json
-{
-  "version": "1.0",
-  "certificates": [
-    {
-      "id": "example-com",
-      "domains": ["example.com", "*.example.com"],
-      "email": "admin@example.com",
-      "acmeProvider": "jprs",
-      "acmeServerUrl": "https://acme.jprs.jp/directory",
-      "route53HostedZoneId": "Z1234567890ABC",
-      "acmCertificateArn": null,
-      "renewDaysBeforeExpiry": 30,
-      "enabled": true
-    }
-  ]
-}
-```
-
-### 3. (オプション) メール通知設定
-
-`bin/acme-to-acm.ts` を編集して、通知先メールアドレスを設定：
-
-```typescript
-new AcmeToAcmStack(app, 'AcmeToAcmStack', {
-  notificationEmail: 'your-email@example.com',
-  // ...
-});
-```
-
-### 4. CDK ブートストラップ（初回のみ）
+### 2. CDK ブートストラップ（初回のみ）
 
 ```bash
 cdk bootstrap aws://ACCOUNT-ID/us-east-1
 ```
 
-### 5. デプロイ
+### 3. デプロイ
 
 ```bash
-# Lambda のビルドと CDK デプロイを一括実行
+# ビルドとデプロイを一括実行（CDK と Lambda の両方がビルドされます）
 npm run deploy
-
-# または個別に実行
-npm run build:lambda
-cdk deploy
 ```
 
 デプロイには 5〜10 分程度かかります（Docker イメージのビルドとアップロードのため）。
 
-### 6. 設定ファイルを S3 にアップロード
+### 4. SNS サブスクリプションの設定（オプション）
 
-デプロイ完了後、出力された S3 バケット名を確認し、設定ファイルをアップロードします：
+メール通知を受け取りたい場合は、SNS トピックに手動でサブスクライブします：
 
 ```bash
-# バケット名は CDK の出力から確認
-aws s3 cp config/domains.json s3://acme-to-acm-certificates-ACCOUNT-ID/config/domains.json
+# トピック ARN はデプロイ時の出力から確認
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:ACCOUNT-ID:AcmeToAcmNotifications \
+  --protocol email \
+  --notification-endpoint your-email@example.com
+
+# 確認メールが届くのでリンクをクリック
 ```
-
-### 7. SNS サブスクリプションの確認
-
-メールアドレスを設定した場合、AWS SNS からメールが届くので、確認リンクをクリックします。
 
 ## 使い方
 
@@ -300,11 +253,12 @@ aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer --follow --region us-east-
 2. **証明書取得** (certonly モード)
    - certonly モードで証明書を取得し ACM にインポート
    - 既に登録済みのアカウントを使用するため EAB は不要
+   - **自動的に domains.json が作成/更新され、renew モードの対象に追加される**
 
-3. **自動更新設定** (renew モード)
-   - domains.json に証明書情報を追加
-   - 毎週自動的に更新チェックが実行される
+3. **自動更新** (renew モード)
+   - certonly で作成された domains.json に基づいて毎週自動更新
    - 有効期限が近づいた証明書のみ自動更新
+   - 必要に応じて手動で domains.json を編集可能
 
 ### 証明書の種類とキータイプ
 

@@ -43,9 +43,7 @@ export class AcmeToAcmStack extends cdk.Stack {
     const storage = new CertificateStorage(this, 'Storage');
 
     // Create SNS topic for notifications
-    const notification = new CertificateNotification(this, 'Notification', {
-      email: props?.notificationEmail,
-    });
+    const notification = new CertificateNotification(this, 'Notification');
 
     // Create Lambda function for certificate renewal
     const certificateLambda = new CertificateLambda(this, 'CertificateLambda', {
@@ -70,10 +68,13 @@ export class AcmeToAcmStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'InstructionsMessage', {
       value: [
         'Next steps:',
-        `1. Upload your domain configuration to s3://${storage.bucket.bucketName}/config/domains.json`,
-        `2. If you provided an email, confirm the SNS subscription sent to ${props?.notificationEmail || 'your email'}`,
-        `3. Test the Lambda function manually before the first scheduled run`,
-        `4. Monitor CloudWatch Logs for execution details`,
+        `1. (Optional) Subscribe to SNS topic for notifications:`,
+        `   aws sns subscribe --topic-arn ${notification.topic.topicArn} --protocol email --notification-endpoint your-email@example.com`,
+        `2. Register ACME account (for JPRS, use EAB credentials):`,
+        `   aws lambda invoke --function-name ${certificateLambda.function.functionName} --payload '{"mode":"register",...}' response.json`,
+        `3. Obtain certificates using certonly mode (automatically creates/updates domains.json):`,
+        `   aws lambda invoke --function-name ${certificateLambda.function.functionName} --payload '{"mode":"certonly",...}' response.json`,
+        `4. Monitor CloudWatch Logs and test automatic renewal`,
       ].join('\n'),
       description: 'Post-deployment instructions',
     });

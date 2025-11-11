@@ -174,9 +174,51 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
     // Sync Certbot config back to S3
     await s3Manager.syncDirectoryToS3(certbotRunner.getConfigDir(), 'certbot');
 
+    // Add certificate to domains.json configuration
+    const domainConfigKey = process.env.DOMAIN_CONFIG_KEY || 'config/domains.json';
+    let config: DomainConfiguration;
+
+    try {
+      const configJson = await s3Manager.downloadConfig(domainConfigKey);
+      config = JSON.parse(configJson);
+      console.log('Loaded existing domains.json configuration');
+    } catch (error) {
+      // File doesn't exist, create new configuration
+      console.log('domains.json not found, creating new configuration');
+      config = {
+        version: '1.0',
+        certificates: [],
+      };
+    }
+
+    // Add new certificate configuration
+    const newCertConfig: CertificateConfig = {
+      id: certId,
+      domains: event.domains,
+      email: event.email,
+      acmeProvider: 'custom',
+      acmeServerUrl: event.server,
+      route53HostedZoneId: event.route53HostedZoneId,
+      acmCertificateArn: acmArn,
+      renewDaysBeforeExpiry: 30,
+      enabled: true,
+      keyType: event.keyType || 'rsa',
+      rsaKeySize: event.rsaKeySize,
+    };
+
+    config.certificates.push(newCertConfig);
+
+    // Upload updated configuration to S3
+    await s3Manager.uploadFile(
+      domainConfigKey,
+      JSON.stringify(config, null, 2)
+    );
+
+    console.log(`Added certificate ${certId} to domains.json configuration`);
+
     // Send success notification
     await notifier.sendSuccess(
-      `Certificate obtained successfully for ${event.domains.join(', ')}\nACM ARN: ${acmArn}`
+      `Certificate obtained successfully for ${event.domains.join(', ')}\nACM ARN: ${acmArn}\nAdded to domains.json for automatic renewal`
     );
 
     const result: RenewalResult = {

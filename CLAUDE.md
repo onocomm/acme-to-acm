@@ -9,17 +9,20 @@ ACME to ACM is a serverless certificate renewal system that automatically obtain
 ## Build Commands
 
 ```bash
-# Build CDK infrastructure (TypeScript → JavaScript)
+# Install dependencies (automatically installs both root and lambda/)
+npm install
+
+# Build everything (CDK + Lambda)
 npm run build
 
-# Build Lambda function code
+# Build Lambda function code only
 npm run build:lambda
 
 # Watch mode for development
 npm run watch                    # CDK
 cd lambda && npm run watch       # Lambda
 
-# Deploy everything (builds both CDK and Lambda, then deploys)
+# Deploy everything (builds and deploys)
 npm run deploy
 
 # View CloudFormation template
@@ -44,10 +47,10 @@ The system operates in three distinct modes based on Lambda event payload:
    - Account info persisted to S3 for subsequent operations
 
 2. **certonly mode**: Manual certificate acquisition from payload parameters
-   - No domains.json required
    - All parameters (domains, email, server URL, etc.) passed in event payload
    - Requires pre-registered ACME account (NO EAB in payload)
-   - Useful for ad-hoc certificate requests
+   - **Automatically creates/updates domains.json** in S3 after successful certificate acquisition
+   - Newly obtained certificates are automatically added to renewal rotation
 
 3. **renew mode**: Automated renewal based on domains.json configuration
    - Weekly EventBridge trigger (default: Sunday 2AM JST)
@@ -66,7 +69,7 @@ The system operates in three distinct modes based on Lambda event payload:
 **Lambda Function** (`lambda/src/`)
 - `index.ts`: Mode router (register/certonly/renew)
   - `handleRegisterMode()`: EAB account registration
-  - `handleCertonlyMode()`: Payload-based certificate acquisition
+  - `handleCertonlyMode()`: Payload-based certificate acquisition, creates/updates domains.json
   - `handleRenewMode()`: Config-based renewal workflow
 - `certbot/runner.ts`: Certbot command wrapper
   - `registerAccount()`: Executes `certbot register` with EAB
@@ -106,7 +109,8 @@ Certbot command includes `--key-type` and conditionally `--rsa-key-size` flags.
 
 **Configuration** (`config/domains.json`)
 - Not checked into git (use `domains.example.json` as template)
-- Uploaded to S3 post-deployment
+- **Automatically created/updated** by certonly mode after successful certificate acquisition
+- Can be manually edited if needed
 - Array of certificate configurations with scheduling and renewal settings
 
 **Dockerfile** (`lambda/Dockerfile`)
@@ -117,12 +121,19 @@ Certbot command includes `--key-type` and conditionally `--rsa-key-size` flags.
 ## Development Workflow
 
 ### Initial Setup
-1. `npm install` (root) and `cd lambda && npm install`
-2. Copy `config/domains.example.json` to `config/domains.json` and configure
-3. `cdk bootstrap` (if first CDK deployment in region)
-4. `npm run deploy`
-5. Upload `config/domains.json` to S3 (bucket name in CDK outputs)
-6. Confirm SNS subscription email if notification address configured
+1. `npm install` (automatically installs both root and lambda/ dependencies)
+2. `cdk bootstrap` (if first CDK deployment in region)
+3. `npm run deploy` (builds and deploys everything)
+4. (Optional) Subscribe to SNS topic manually:
+   ```bash
+   aws sns subscribe \
+     --topic-arn arn:aws:sns:us-east-1:ACCOUNT-ID:AcmeToAcmNotifications \
+     --protocol email \
+     --notification-endpoint your-email@example.com
+   ```
+5. Register ACME account (register mode)
+6. Obtain certificates (certonly mode) - automatically creates domains.json
+7. Automatic renewal will start on weekly schedule
 
 ### Making Changes
 
@@ -196,9 +207,13 @@ Weekly trigger configured in `lib/constructs/certificate-lambda.ts`:
 
 ## JPRS-Specific Notes
 
-JPRS requires two-step workflow:
+JPRS requires three-step workflow:
 1. Obtain temporary EAB credentials from JPRS portal
 2. Use **register mode** with EAB to create ACME account (one-time)
-3. Use **certonly mode** or **renew mode** for all subsequent operations (no EAB required)
+3. Use **certonly mode** to obtain certificates (no EAB required)
+   - Automatically creates/updates domains.json for renewal tracking
+4. **renew mode** runs automatically weekly for all registered certificates
 
 EAB credentials are invalidated by JPRS after successful registration - do not attempt to reuse.
+
+**Important**: After certonly mode successfully obtains a certificate, it is automatically added to domains.json in S3. Manual editing of domains.json is optional - certonly mode handles the configuration lifecycle.

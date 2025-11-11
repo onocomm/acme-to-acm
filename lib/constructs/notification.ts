@@ -1,6 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
 import * as sns from 'aws-cdk-lib/aws-sns';
-import * as subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import { Construct } from 'constructs';
 
 /**
@@ -8,10 +7,8 @@ import { Construct } from 'constructs';
  */
 export interface CertificateNotificationProps {
   /**
-   * Email address to send notifications to (optional)
-   * If provided, an email subscription will be created
+   * Placeholder for future configuration options
    */
-  email?: string;
 }
 
 /**
@@ -29,17 +26,8 @@ export class CertificateNotification extends Construct {
       topicName: 'AcmeToAcmNotifications',
     });
 
-    // Add email subscription if provided
-    if (props?.email) {
-      this.topic.addSubscription(
-        new subscriptions.EmailSubscription(props.email)
-      );
-
-      new cdk.CfnOutput(this, 'EmailSubscription', {
-        value: props.email,
-        description: 'Email subscription for notifications (requires confirmation)',
-      });
-    }
+    // Note: Email subscriptions should be added manually by administrators
+    // Use AWS Console or CLI: aws sns subscribe --topic-arn <ARN> --protocol email --notification-endpoint <EMAIL>
 
     // Add CloudFormation outputs
     new cdk.CfnOutput(this, 'TopicArn', {

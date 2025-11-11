@@ -6,12 +6,13 @@
     "acme-to-acm": "bin/acme-to-acm.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:lambda",
     "watch": "tsc -w",
     "cdk": "cdk",
     "build:lambda": "cd lambda && npm run build",
     "test": "jest",
-    "deploy": "npm run build && npm run build:lambda && cdk deploy",
+    "postinstall": "cd lambda && npm install",
+    "deploy": "npm run build && cdk deploy",
     "synth": "npm run build && cdk synth",
     "diff": "npm run build && cdk diff"
   },

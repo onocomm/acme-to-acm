@@ -15,10 +15,10 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
   },
 
   /**
-   * Email address for notifications (optional)
-   * Uncomment and set your email to receive renewal notifications
+   * SNS notifications are available via the AcmeToAcmNotifications topic
+   * Subscribe manually using AWS Console or CLI after deployment:
+   * aws sns subscribe --topic-arn <TOPIC_ARN> --protocol email --notification-endpoint your-email@example.com
    */
-  // notificationEmail: 'your-email@example.com',
 
   /**
    * Schedule expression for automatic renewal
