@@ -29,7 +29,9 @@ ACME プロトコルを使用したサーバー証明書の自動更新システ
 ┌─────────────────────┐
 │  Lambda Function    │
 │  (Container Image)  │
-│  - Node.js v22      │
+│  - AL2023 OS-only   │
+│  - Node.js 22       │
+│  - Python 3.13      │
 │  - Certbot          │
 └──────────┬──────────┘
            │
@@ -40,6 +42,17 @@ ACME プロトコルを使用したサーバー証明書の自動更新システ
 │ Bucket  │ │ DNS    │ │ Import │ │Notify│
 └─────────┘ └────────┘ └────────┘ └──────┘
 ```
+
+### コンテナイメージの構成
+
+このプロジェクトは `public.ecr.aws/lambda/provided:al2023` (Amazon Linux 2023 OS-only ベースイメージ) を使用しています。これにより、Node.js と Python の両方を対等な依存関係として扱い、以下の利点があります：
+
+- **ランタイムの対等な扱い**: Node.js 22 と Python 3.13 の両方を明示的にインストール
+- **OpenSSL 互換性**: ランタイム固有のイメージで発生する OpenSSL 互換性の問題を回避
+- **依存関係の明確化**: すべての依存関係が Dockerfile に明記される
+- **カスタムランタイム制御**: AWS Lambda Runtime Interface Client (RIC) による完全な制御
+
+**重要**: デプロイやインストールでエラーが発生しても、`python:3.13` や `nodejs:22` などのランタイム固有のイメージに変更しないでください。`provided:al2023` の範囲内でトラブルシューティングを行います。
 
 ## ディレクトリ構造
 

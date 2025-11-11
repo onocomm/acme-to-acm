@@ -1,32 +1,48 @@
-# Use AWS Lambda Node.js 22 base image
-FROM public.ecr.aws/lambda/nodejs:22
+# Use AWS Lambda OS-only base image (Amazon Linux 2023)
+# This approach treats both Node.js and Python as equal dependencies
+FROM public.ecr.aws/lambda/provided:al2023
 
-# Install Python 3 and pip (required for Certbot)
+# Install Node.js 22, Python 3.13, and build dependencies
 RUN dnf install -y \
-    python3 \
-    python3-pip \
-    python3-devel \
+    nodejs \
+    npm \
+    python3.13 \
+    python3.13-pip \
+    cmake \
     gcc \
-    openssl-devel \
+    gcc-c++ \
+    make \
+    tar \
+    autoconf \
+    automake \
+    libtool \
     && dnf clean all
 
-# Install Certbot and Route53 plugin using official installation method
-# This ensures we get the latest stable version from PyPI
-RUN pip3 install --no-cache-dir \
+# Install Certbot and Route53 plugin via pip
+RUN pip3.13 install --no-cache-dir \
     certbot \
     certbot-dns-route53
 
-# Verify Certbot installation
-RUN certbot --version
+# Verify installations
+RUN node --version && python3.13 --version && certbot --version
 
-# Copy package files
+# Set working directory to Lambda task root
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy package files and install dependencies
 COPY package*.json ./
-
-# Install Node.js dependencies
 RUN npm ci --only=production
 
-# Copy compiled TypeScript code
+# Install AWS Lambda Runtime Interface Client locally
+RUN npm install aws-lambda-ric
+
+# Copy TypeScript compiled code
 COPY dist ./dist
 
-# Set the CMD to your handler
-CMD [ "dist/index.handler" ]
+# Verify paths before setting ENTRYPOINT
+RUN which node && ls -la ${LAMBDA_TASK_ROOT}/node_modules/.bin/
+
+# Use the locally installed RIC with direct node execution
+ENTRYPOINT ["/usr/bin/node", "/var/task/node_modules/aws-lambda-ric/bin/index.js"]
+# Pass the name of the function handler as an argument to the runtime
+CMD ["dist/index.handler"]

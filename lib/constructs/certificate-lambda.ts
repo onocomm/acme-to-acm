@@ -7,6 +7,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as path from 'path';
 import { Construct } from 'constructs';
+import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 
 /**
  * Props for CertificateLambda construct
@@ -62,11 +63,13 @@ export class CertificateLambda extends Construct {
         path.join(__dirname, '../../lambda'),
         {
           file: 'Dockerfile',
+          platform: Platform.LINUX_AMD64,
         }
       ),
       memorySize: 1024,
       timeout: cdk.Duration.minutes(15),
       ephemeralStorageSize: cdk.Size.mebibytes(2048),
+      architecture: lambda.Architecture.X86_64,
       environment: {
         CERTIFICATE_BUCKET: props.bucket.bucketName,
         SNS_TOPIC_ARN: props.snsTopic.topicArn,
@@ -145,20 +148,7 @@ export class CertificateLambda extends Construct {
       })
     );
 
-    // CloudWatch Logs (already granted by default, but explicitly stated for clarity)
-    this.function.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          'logs:CreateLogGroup',
-          'logs:CreateLogStream',
-          'logs:PutLogEvents',
-        ],
-        resources: [
-          `arn:aws:logs:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:log-group:/aws/lambda/${this.function.functionName}:*`,
-        ],
-      })
-    );
+    // Note: CloudWatch Logs permissions are automatically granted by Lambda
   }
 
   /**

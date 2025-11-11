@@ -91,6 +91,28 @@ Critical design pattern: Certbot account registration state is ephemeral within 
 
 This enables stateless Lambda functions to maintain ACME account continuity.
 
+### Container Image Architecture: OS-Only Base (provided:al2023)
+
+**Why OS-Only Base Image Instead of Runtime-Specific Images**
+
+This project uses `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 2023) rather than language-specific base images like `python:3.13` or `nodejs:22`. This architectural decision provides several benefits:
+
+1. **Equal Treatment of Runtimes**: Both Node.js and Python are explicitly installed dependencies, avoiding implicit bias toward one runtime over the other
+2. **OpenSSL Compatibility**: Runtime-specific images (especially nodejs) may use `openssl-snapsafe-libs` which is incompatible with Certbot's cryptography package requirements
+3. **Explicit Dependency Management**: All dependencies (Node.js 22, Python 3.13, Certbot) are clearly visible in the Dockerfile
+4. **Custom Runtime Control**: Full control over runtime versions and Lambda Runtime Interface Client configuration
+
+**Critical Constraint**: **DO NOT** change the base image to `python:3.13`, `nodejs:22`, or any other runtime-specific image, even if deployment or installation errors occur. Troubleshoot within the provided:al2023 context instead.
+
+**Technical Implementation**:
+- Base: `public.ecr.aws/lambda/provided:al2023`
+- Node.js Runtime: Installed via dnf (Node.js 22)
+- Python Runtime: Installed via dnf (Python 3.13)
+- Lambda RIC: `aws-lambda-ric` npm package for custom Node.js runtime
+- Handler: TypeScript (compiled to `dist/index.handler`)
+- ENTRYPOINT: `/usr/bin/npx aws-lambda-ric`
+- CMD: `dist/index.handler`
+
 ### Key Type Support
 
 Certificates can use different key algorithms (configurable in domains.json or certonly payload):
@@ -114,9 +136,12 @@ Certbot command includes `--key-type` and conditionally `--rsa-key-size` flags.
 - Array of certificate configurations with scheduling and renewal settings
 
 **Dockerfile** (`lambda/Dockerfile`)
-- Base: `public.ecr.aws/lambda/nodejs:22`
-- Installs Python 3 + pip, then Certbot and certbot-dns-route53 from PyPI
+- Base: `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 2023 image)
+- Installs both Node.js 22 and Python 3.13 as equal dependencies
+- Installs Certbot and certbot-dns-route53 via pip
+- Uses AWS Lambda Runtime Interface Client (RIC) for custom Node.js runtime
 - Copies compiled TypeScript from `lambda/dist/`
+- **CRITICAL**: This base image must NOT be changed to other images (e.g., python:3.13, nodejs:22) even if deployment or installation errors occur. The provided:al2023 approach treats both runtimes equally and avoids OpenSSL compatibility issues
 
 ## Development Workflow
 
