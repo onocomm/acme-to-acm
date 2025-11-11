@@ -91,6 +91,24 @@ Critical design pattern: Certbot account registration state is ephemeral within 
 
 This enables stateless Lambda functions to maintain ACME account continuity.
 
+**S3 Bucket Structure**:
+```
+s3://acme-to-acm-certificates-{account-id}/
+├── certbot/                    # Certbot state (synced bidirectionally)
+│   ├── config/                 # ACME account registration
+│   ├── work/                   # Temporary working files
+│   └── logs/                   # Certbot operation logs
+├── config/
+│   └── domains.json            # Certificate configuration (auto-created by certonly mode)
+└── certificates/               # Certificate backups (timestamped)
+    └── {domain}/
+        └── {timestamp}/
+            ├── cert.pem
+            ├── chain.pem
+            ├── fullchain.pem
+            └── privkey.pem
+```
+
 ### Container Image Architecture: OS-Only Base (provided:al2023)
 
 **Why OS-Only Base Image Instead of Runtime-Specific Images**
@@ -112,6 +130,7 @@ This project uses `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 
 - Handler: TypeScript (compiled to `dist/index.handler`)
 - ENTRYPOINT: `/usr/bin/npx aws-lambda-ric`
 - CMD: `dist/index.handler`
+- **NPM Cache**: `ENV NPM_CONFIG_CACHE=/tmp/.npm` (required for npm@8.6.0+ in read-only Lambda filesystem)
 
 ### Key Type Support
 
@@ -141,6 +160,7 @@ Certbot command includes `--key-type` and conditionally `--rsa-key-size` flags.
 - Installs Certbot and certbot-dns-route53 via pip
 - Uses AWS Lambda Runtime Interface Client (RIC) for custom Node.js runtime
 - Copies compiled TypeScript from `lambda/dist/`
+- **NPM Cache Configuration**: Sets `ENV NPM_CONFIG_CACHE=/tmp/.npm` to redirect npm cache writes to Lambda's writable `/tmp` directory (required for npm@8.6.0+, which defaults to read-only `/home/.npm`)
 - **CRITICAL**: This base image must NOT be changed to other images (e.g., python:3.13, nodejs:22) even if deployment or installation errors occur. The provided:al2023 approach treats both runtimes equally and avoids OpenSSL compatibility issues
 
 ## Development Workflow
@@ -179,26 +199,120 @@ Lambda uses Docker container image - local testing requires Docker runtime simul
 2. Test with `aws lambda invoke` (see README examples)
 3. Monitor CloudWatch Logs: `aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer --follow`
 
+### Monitoring and Debugging
+
+**CloudWatch Logs**:
+```bash
+# Tail logs in real-time
+aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer --follow --region us-east-1
+
+# Filter for errors
+aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer --filter-pattern "ERROR" --region us-east-1
+
+# View specific time range
+aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
+  --since 1h \
+  --region us-east-1
+```
+
+**Key Log Patterns**:
+- `INIT_REPORT` - Lambda initialization metrics (check for timeouts or errors)
+- `START RequestId:` - Function invocation start
+- `END RequestId:` - Function invocation end
+- `REPORT RequestId:` - Performance metrics (duration, memory, billed duration)
+- `ERROR` - Application errors
+- `Certbot output:` - Certbot command execution details
+
+**SNS Notifications**:
+- Success: Certificate renewal completion with summary
+- Error: Failure details with error message and stack trace
+- Note: SNS failures don't break the renewal process - CloudWatch Logs are the source of truth
+
+## Troubleshooting
+
+### Docker Build Issues
+
+**Symptom**: `ERROR: failed to commit ... snapshot does not exist: not found`
+- **Cause**: Docker buildx cache corruption
+- **Solution**: Clean Docker cache and restart
+  ```bash
+  docker system prune -a -f
+  docker buildx prune -a -f
+  # Restart Docker Desktop
+  ```
+
+**Symptom**: `openssl-snapsafe-libs` conflicts during pip install
+- **Cause**: Using wrong base image (e.g., `nodejs:22` instead of `provided:al2023`)
+- **Solution**: Ensure Dockerfile uses `public.ecr.aws/lambda/provided:al2023` base image
+
+### Lambda Runtime Errors
+
+**Symptom**: `Runtime.InvalidEntrypoint` or `ProcessSpawnFailed`
+- **Cause**: ENTRYPOINT misconfiguration in Dockerfile
+- **Solution**: Verify ENTRYPOINT is `/usr/bin/npx aws-lambda-ric` and CMD is `dist/index.handler`
+
+**Symptom**: `EROFS: read-only file system, mkdir '/home/sbx_user1051'`
+- **Cause**: npm/npx attempting to write cache to read-only home directory
+- **Solution**: Add `ENV NPM_CONFIG_CACHE=/tmp/.npm` to Dockerfile before ENTRYPOINT
+
+**Symptom**: Lambda initialization timeout (9999.99ms)
+- **Cause**: Usually related to npm cache issues or missing dependencies
+- **Solution**: Check CloudWatch logs for specific error, verify `aws-lambda-ric` is installed
+
+### Deployment Issues
+
+**Symptom**: `docker login ... exited with error code 1: 500 Internal Server Error`
+- **Cause**: Docker Desktop not fully started or API incompatibility
+- **Solution**:
+  1. Verify Docker is running: `docker info`
+  2. Restart Docker Desktop completely
+  3. Wait 30-60 seconds for full initialization
+
+**Symptom**: Deployment succeeds but Lambda returns 500 with "key does not exist"
+- **Cause**: Normal behavior - `config/domains.json` doesn't exist yet
+- **Solution**: Run certonly mode to create initial certificate configuration
+
+### Lambda Invocation
+
+**Always specify region** for Lambda invocations:
+```bash
+aws lambda invoke --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"mode":"renew","dryRun":true}' \
+  response.json
+```
+
 ## Common Payload Examples
+
+All Lambda invocations must specify `--region us-east-1` and `--cli-binary-format raw-in-base64-out`:
 
 ```bash
 # Register ACME account (JPRS)
-aws lambda invoke --function-name AcmeToAcmCertificateRenewer \
+aws lambda invoke --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
   --payload '{"mode":"register","email":"admin@example.com","server":"https://acme.jprs.jp/directory","eabKid":"TEMP_KID","eabHmacKey":"TEMP_KEY"}' \
   response.json
 
 # Obtain certificate manually
-aws lambda invoke --function-name AcmeToAcmCertificateRenewer \
+aws lambda invoke --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
   --payload '{"mode":"certonly","domains":["example.com","*.example.com"],"email":"admin@example.com","server":"https://acme.jprs.jp/directory","route53HostedZoneId":"Z123","keyType":"rsa","rsaKeySize":2048}' \
   response.json
 
 # Manual renewal (all enabled certificates)
-aws lambda invoke --function-name AcmeToAcmCertificateRenewer \
+aws lambda invoke --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
   --payload '{"mode":"renew"}' \
   response.json
 
 # Dry run renewal
-aws lambda invoke --function-name AcmeToAcmCertificateRenewer \
+aws lambda invoke --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
   --payload '{"mode":"renew","dryRun":true}' \
   response.json
 ```
