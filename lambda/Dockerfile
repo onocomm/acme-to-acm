@@ -39,10 +39,11 @@ RUN npm install aws-lambda-ric
 # Copy TypeScript compiled code
 COPY dist ./dist
 
-# Verify paths before setting ENTRYPOINT
-RUN which node && ls -la ${LAMBDA_TASK_ROOT}/node_modules/.bin/
+# Required for Node runtimes which use npm@8.6.0+ because
+# by default npm writes logs under /home/.npm and Lambda fs is read-only
+ENV NPM_CONFIG_CACHE=/tmp/.npm
 
-# Use the locally installed RIC with direct node execution
-ENTRYPOINT ["/usr/bin/node", "/var/task/node_modules/aws-lambda-ric/bin/index.js"]
+# Use the locally installed RIC with npx
+ENTRYPOINT ["/usr/bin/npx", "aws-lambda-ric"]
 # Pass the name of the function handler as an argument to the runtime
 CMD ["dist/index.handler"]
