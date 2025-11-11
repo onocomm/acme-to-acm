@@ -2,10 +2,6 @@ import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsV2Command } fr
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
-import { promisify } from 'util';
-import { exec } from 'child_process';
-
-const execAsync = promisify(exec);
 
 /**
  * S3Manager handles all S3 operations for certificate storage and configuration

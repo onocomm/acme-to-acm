@@ -1,6 +1,6 @@
 import { AcmeProvider, AcmeProviderConfig } from '../types/domain-config';
 import { JPRS_PROVIDER } from './jprs-provider';
-import { LETSENCRYPT_PRODUCTION, LETSENCRYPT_STAGING } from './letsencrypt-provider';
+import { LETSENCRYPT_PRODUCTION } from './letsencrypt-provider';
 
 /**
  * Get ACME provider configuration by name
