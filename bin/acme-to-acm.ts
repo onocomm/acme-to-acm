@@ -1,48 +1,79 @@
 #!/usr/bin/env node
+/**
+ * ACME to ACM CDK アプリケーションのエントリーポイント
+ *
+ * CDK スタックを初期化し、デプロイ設定を指定する。
+ * このファイルは `cdk deploy` コマンドによって実行される。
+ *
+ * 主要な設定:
+ * - デプロイリージョン: us-east-1（CloudFront 証明書の要件）
+ * - スタック名: AcmeToAcmStack
+ * - タグ: プロジェクト管理用
+ */
+
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { AcmeToAcmStack } from '../lib/acme-to-acm-stack';
 
+// CDK アプリケーションを作成
 const app = new cdk.App();
 
+// ACME to ACM スタックを作成してデプロイ
 new AcmeToAcmStack(app, 'AcmeToAcmStack', {
   /**
-   * Deployment region - must be us-east-1 for CloudFront certificates
+   * デプロイ先の AWS アカウントとリージョン
+   *
+   * 重要: CloudFront で使用する証明書は us-east-1 リージョンの ACM にインポートする必要がある
+   * これは AWS CloudFront の仕様による制約
    */
   env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: 'us-east-1',
+    account: process.env.CDK_DEFAULT_ACCOUNT, // 現在の AWS アカウント ID
+    region: 'us-east-1', // 必須リージョン（CloudFront 証明書用）
   },
 
   /**
-   * SNS notifications are available via the AcmeToAcmNotifications topic
-   * Subscribe manually using AWS Console or CLI after deployment:
+   * SNS 通知の設定
+   *
+   * 証明書更新の成功/失敗通知を受け取るには、デプロイ後に手動で
+   * AcmeToAcmNotifications トピックにメールアドレスをサブスクライブする
+   *
+   * サブスクリプション追加コマンド:
    * aws sns subscribe --topic-arn <TOPIC_ARN> --protocol email --notification-endpoint your-email@example.com
    */
 
   /**
-   * Schedule expression for automatic renewal
-   * Default: Weekly on Sunday at 2AM JST (Saturday 17:00 UTC)
-   * Customize as needed using EventBridge cron syntax
+   * 自動更新スケジュール式（EventBridge cron）
+   *
+   * デフォルト: 毎週日曜日 2:00 JST（UTC 土曜日 17:00）
+   * EventBridge cron 構文を使用してカスタマイズ可能
+   *
+   * 例:
+   * - 'cron(0 17 ? * SUN *)' - 毎週日曜日 2:00 JST
+   * - 'cron(0 3 1 * ? *)' - 毎月 1 日 12:00 JST
+   * - 'cron(0 0 ? * MON-FRI *)' - 毎平日 9:00 JST
    */
   // scheduleExpression: 'cron(0 17 ? * SUN *)',
 
   /**
-   * Enable/disable automatic renewal schedule
-   * Set to false to disable scheduled renewal (manual only)
+   * 自動更新スケジュールの有効化/無効化
+   *
+   * false に設定すると EventBridge スケジュールが作成されず、
+   * 手動実行のみになる（テスト環境などで有用）
    */
   // enableSchedule: true,
 
   /**
-   * Stack description
+   * スタックの説明
+   * CloudFormation コンソールで表示される
    */
   description: 'ACME to ACM certificate renewal system with Certbot on Lambda',
 
   /**
-   * Stack tags
+   * スタックタグ
+   * AWS リソースの管理と請求の分類に使用
    */
   tags: {
-    Project: 'AcmeToAcm',
-    ManagedBy: 'CDK',
+    Project: 'AcmeToAcm', // プロジェクト名
+    ManagedBy: 'CDK', // CDK による管理を示す
   },
 });
