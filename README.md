@@ -76,7 +76,12 @@ acme-to-acm/
 
 - Node.js 22 以上
 - AWS CLI 設定済み
-- Docker (Lambda イメージビルド用)
+- **Docker Desktop** (Lambda コンテナイメージビルド用)
+  - [macOS](https://docs.docker.com/desktop/install/mac-install/)
+  - [Windows](https://docs.docker.com/desktop/install/windows-install/)
+  - [Linux](https://docs.docker.com/desktop/install/linux-install/)
+  - インストール後、Docker Desktop を起動してください
+  - 動作確認: `docker ps` が正常に実行できること
 - AWS CDK CLI (`npm install -g aws-cdk`)
 
 ## セットアップ
@@ -318,6 +323,36 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
 
 ### Docker ビルドエラー
 
+**エラー**: `Failed to find and execute 'docker'`
+
+**原因**: Docker Desktop がインストールされていないか、起動していない
+
+**解決方法**:
+
+1. **Docker Desktop がインストールされているか確認**
+   ```bash
+   docker --version
+   ```
+   インストールされていない場合は、[前提条件](#前提条件)セクションのリンクからインストールしてください。
+
+2. **Docker Desktop が起動しているか確認**
+   - macOS: メニューバーに Docker アイコンが表示され、"Docker Desktop is running" になっている
+   - Windows: システムトレイに Docker アイコンが表示されている
+
+3. **Docker デーモンの動作確認**
+   ```bash
+   docker ps
+   ```
+   成功する場合、コンテナ一覧が表示されます。
+
+4. **上記が成功したら、再度デプロイを実行**
+   ```bash
+   npm run deploy
+   ```
+
+**注**: Lambda Container Image のビルドには Docker が必須です。このプロジェクトは Certbot (Python製) を Node.js Lambda 環境で動作させるため、カスタムコンテナイメージを使用しています。
+
+**ローカルでのビルドテスト**:
 ```bash
 # Lambda ディレクトリでビルドテスト
 cd lambda
