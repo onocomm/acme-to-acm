@@ -5,6 +5,9 @@ FROM public.ecr.aws/lambda/nodejs:22
 RUN dnf install -y \
     python3 \
     python3-pip \
+    python3-devel \
+    gcc \
+    openssl-devel \
     && dnf clean all
 
 # Install Certbot and Route53 plugin using official installation method
