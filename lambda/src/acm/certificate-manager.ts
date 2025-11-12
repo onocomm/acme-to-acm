@@ -60,7 +60,7 @@ export class CertificateManager {
     console.log('Importing certificate to ACM...');
 
     // 証明書ファイルを読み込み
-    const certificate = fs.readFileSync(certPaths.fullChainPath); // 証明書 + チェーン
+    const certificate = fs.readFileSync(certPaths.certPath); // 証明書のみ
     const privateKey = fs.readFileSync(certPaths.privateKeyPath); // 秘密鍵
     const certificateChain = fs.readFileSync(certPaths.chainPath); // 中間証明書チェーン
 
