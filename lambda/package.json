@@ -15,7 +15,7 @@
     "lambda",
     "acm"
   ],
-  "author": "",
+  "author": "Onocom Co., Ltd.",
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-acm": "^3.713.0",

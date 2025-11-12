@@ -406,7 +406,11 @@ docker build -t acme-to-acm-test .
 
 ## ライセンス
 
-MIT
+MIT License
+
+Copyright (c) 2025 株式会社オノコム (Onocom Co., Ltd.)
+
+詳細は [LICENSE](LICENSE) ファイルを参照してください。
 
 ## 参考リンク
 
