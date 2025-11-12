@@ -297,6 +297,16 @@ AWS_PROFILE=account-b CDK_DEPLOY_REGION=eu-west-1 STACK_SUFFIX=-alb-ireland npm 
 
 JPRS などの EAB が必要なプロバイダーで最初にアカウントを登録します。
 
+#### パラメーター
+
+| パラメーター | 必須 | 型 | 説明 | 例 |
+|------------|------|-----|------|-----|
+| `mode` | ✅ 必須 | string | 実行モード（固定値） | `"register"` |
+| `email` | ✅ 必須 | string | 連絡先メールアドレス | `"admin@example.com"` |
+| `server` | ✅ 必須 | string | ACME サーバー URL | `"https://acme.amecert.jprs.jp/DV/getDirectory"` |
+| `eabKid` | ✅ 必須 | string | External Account Binding Key ID（JPRS から一時発行） | `"YOUR_TEMPORARY_EAB_KID"` |
+| `eabHmacKey` | ✅ 必須 | string | External Account Binding HMAC Key（JPRS から一時発行） | `"YOUR_TEMPORARY_EAB_HMAC_KEY"` |
+
 ```bash
 # JPRS から一時的に発行された EAB 認証情報を使用
 aws lambda invoke \
@@ -322,6 +332,20 @@ cat response.json
 ### Mode 2: certonly（証明書の手動取得）
 
 ペイロードで指定したドメインの証明書を取得し、ACM にインポートします。
+
+#### パラメーター
+
+| パラメーター | 必須 | 型 | デフォルト | 説明 | 例 |
+|------------|------|-----|-----------|------|-----|
+| `mode` | ✅ 必須 | string | - | 実行モード（固定値） | `"certonly"` |
+| `domains` | ✅ 必須 | string[] | - | 証明書に含めるドメインのリスト | `["example.com", "*.example.com"]` |
+| `email` | ✅ 必須 | string | - | 連絡先メールアドレス | `"admin@example.com"` |
+| `server` | ✅ 必須 | string | - | ACME サーバー URL | `"https://acme.amecert.jprs.jp/DV/getDirectory"` |
+| `route53HostedZoneId` | ✅ 必須 | string | - | DNS 検証用の Route53 ホストゾーン ID | `"Z1234567890ABC"` |
+| `acmCertificateArn` | ⭕ オプション | string | `null` | 既存 ACM 証明書への再インポート時に指定 | `"arn:aws:acm:us-east-1:123456789012:certificate/xxx"` |
+| `keyType` | ⭕ オプション | `"rsa"` \| `"ecdsa"` | `"rsa"` | 証明書のキータイプ | `"rsa"` または `"ecdsa"` |
+| `rsaKeySize` | ⭕ オプション | `2048` \| `4096` | `2048` | RSA キーサイズ（`keyType` が `"rsa"` の場合のみ有効） | `2048` または `4096` |
+| `forceRenewal` | ⭕ オプション | boolean | `false` | 有効期限前でも強制的に更新するか | `true` または `false` |
 
 ```bash
 # 新規証明書の取得
@@ -380,6 +404,14 @@ aws lambda invoke \
 ### Mode 3: renew（自動更新）
 
 domains.json の設定に基づいて証明書を更新します（週次スケジュールで自動実行）。
+
+#### パラメーター
+
+| パラメーター | 必須 | 型 | デフォルト | 説明 | 例 |
+|------------|------|-----|-----------|------|-----|
+| `mode` | ✅ 必須 | string | - | 実行モード（固定値） | `"renew"` |
+| `certificateIds` | ⭕ オプション | string[] | `[]`（全証明書） | 更新対象の証明書 ID リスト（未指定時は有効なすべての証明書が対象） | `["example-com", "another-domain"]` |
+| `dryRun` | ⭕ オプション | boolean | `false` | ドライランモード（実際の変更は行わない） | `true` または `false` |
 
 ```bash
 # 全ての有効な証明書を処理（自動実行と同じ）
