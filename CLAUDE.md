@@ -228,6 +228,77 @@ aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
 - Error: Failure details with error message and stack trace
 - Note: SNS failures don't break the renewal process - CloudWatch Logs are the source of truth
 
+## Multi-Account Deployment
+
+The project supports deployment to multiple AWS accounts using AWS CLI profiles. CDK automatically recognizes the `AWS_PROFILE` environment variable and `--profile` option.
+
+### Method 1: Environment Variable (Recommended)
+
+Use the `AWS_PROFILE` environment variable for all commands:
+
+```bash
+# Bootstrap (first time only)
+AWS_PROFILE=production cdk bootstrap aws://ACCOUNT-ID/us-east-1
+
+# Deploy
+AWS_PROFILE=production npm run deploy
+
+# Diff
+AWS_PROFILE=staging npm run diff
+
+# Destroy
+AWS_PROFILE=staging cdk destroy
+```
+
+### Method 2: --profile Option
+
+Pass the `--profile` option directly to CDK commands:
+
+```bash
+# Bootstrap (first time only)
+cdk bootstrap aws://ACCOUNT-ID/us-east-1 --profile production
+
+# Build then deploy
+npm run build
+cdk deploy --profile production
+
+# Build then diff
+npm run build
+cdk diff --profile staging
+```
+
+### Combined with Multi-Stack Deployment
+
+Deploy different stacks to different accounts:
+
+```bash
+# Deploy JPRS stack to Account A
+AWS_PROFILE=account-a STACK_SUFFIX=-jprs npm run deploy
+
+# Deploy Let's Encrypt stack to Account B
+AWS_PROFILE=account-b STACK_SUFFIX=-letsencrypt npm run deploy
+```
+
+### Lambda Invocation with Profiles
+
+When invoking Lambda functions, specify the same profile:
+
+```bash
+# Invoke Lambda in production account
+AWS_PROFILE=production aws lambda invoke \
+  --region us-east-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"input":{"mode":"certonly",...}}' \
+  response.json
+```
+
+### Important Notes
+
+- **Region Lock**: Always deploys to `us-east-1` (CloudFront certificate requirement)
+- **Bootstrap**: Each account/region requires one-time `cdk bootstrap`
+- **Account Detection**: `process.env.CDK_DEFAULT_ACCOUNT` in bin/acme-to-acm.ts automatically detects the account from the specified profile
+
 ## Troubleshooting
 
 ### Docker Build Issues

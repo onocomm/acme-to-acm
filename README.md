@@ -135,6 +135,91 @@ aws sns subscribe \
 # 確認メールが届くのでリンクをクリック
 ```
 
+## マルチアカウントデプロイ
+
+このプロジェクトは複数の AWS アカウントへのデプロイに対応しています。AWS CLI のプロファイル機能を使用して、アカウントを切り替えることができます。
+
+### 前提条件
+
+`~/.aws/credentials` に複数のプロファイルが設定されていること：
+
+```ini
+[default]
+aws_access_key_id = AKIA...
+aws_secret_access_key = ...
+
+[production]
+aws_access_key_id = AKIA...
+aws_secret_access_key = ...
+
+[staging]
+aws_access_key_id = AKIA...
+aws_secret_access_key = ...
+```
+
+### 方法1: 環境変数を使う（推奨）
+
+環境変数 `AWS_PROFILE` を指定してコマンドを実行：
+
+```bash
+# Bootstrap（初回のみ）
+AWS_PROFILE=production cdk bootstrap
+
+# デプロイ
+AWS_PROFILE=production npm run deploy
+
+# 差分確認
+AWS_PROFILE=staging npm run diff
+
+# スタック削除
+AWS_PROFILE=staging cdk destroy
+```
+
+### 方法2: --profile オプションを使う
+
+CDK コマンドに直接 `--profile` オプションを指定：
+
+```bash
+# Bootstrap（初回のみ）
+cdk bootstrap --profile production
+
+# デプロイ（ビルドしてから）
+npm run build
+cdk deploy --profile production
+
+# 差分確認
+npm run build
+cdk diff --profile staging
+```
+
+### マルチスタック + マルチアカウント
+
+異なるアカウントに異なるスタックをデプロイすることも可能：
+
+```bash
+# アカウントA に JPRS 用スタックをデプロイ
+AWS_PROFILE=account-a STACK_SUFFIX=-jprs npm run deploy
+
+# アカウントB に Let's Encrypt 用スタックをデプロイ
+AWS_PROFILE=account-b STACK_SUFFIX=-letsencrypt npm run deploy
+```
+
+### 注意事項
+
+- **リージョン固定**: CloudFront 証明書の要件により、常に `us-east-1` にデプロイされます
+- **Bootstrap**: 各アカウント・リージョンで初回のみ `cdk bootstrap` が必要です
+- **Lambda 実行**: デプロイ後の Lambda 実行時も同じプロファイルを指定してください
+
+```bash
+# 証明書取得（production アカウント）
+AWS_PROFILE=production aws lambda invoke \
+  --function-name AcmeToAcmCertificateRenewer \
+  --region us-east-1 \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"input":{"mode":"certonly",...}}' \
+  response.json
+```
+
 ## 使い方
 
 このシステムは3つのモードで動作します：
