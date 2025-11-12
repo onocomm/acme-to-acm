@@ -186,15 +186,17 @@ export interface CertbotCertificatePaths {
  * EAB を使用した ACME アカウント登録
  */
 export interface RegisterPayload {
-  mode: 'register';
-  /** 連絡先メールアドレス */
-  email: string;
-  /** ACME サーバー URL */
-  server: string;
-  /** External Account Binding Key ID（JPRS から一時的に発行） */
-  eabKid: string;
-  /** External Account Binding HMAC Key（JPRS から一時的に発行） */
-  eabHmacKey: string;
+  input: {
+    mode: 'register';
+    /** 連絡先メールアドレス */
+    email: string;
+    /** ACME サーバー URL */
+    server: string;
+    /** External Account Binding Key ID（JPRS から一時的に発行） */
+    eabKid: string;
+    /** External Account Binding HMAC Key（JPRS から一時的に発行） */
+    eabHmacKey: string;
+  };
 }
 
 /**
@@ -202,23 +204,25 @@ export interface RegisterPayload {
  * 手動での証明書取得
  */
 export interface CertonlyPayload {
-  mode: 'certonly';
-  /** 証明書に含めるドメイン */
-  domains: string[];
-  /** 連絡先メールアドレス */
-  email: string;
-  /** ACME サーバー URL */
-  server: string;
-  /** DNS 検証用の Route53 ホストゾーン ID */
-  route53HostedZoneId: string;
-  /** 再インポート用の既存 ACM 証明書 ARN（新規の場合は null） */
-  acmCertificateArn?: string | null;
-  /** 証明書のキータイプ @default 'rsa' */
-  keyType?: KeyType;
-  /** RSA キーサイズ @default 2048 */
-  rsaKeySize?: 2048 | 4096;
-  /** 有効期限前でも強制的に更新するか */
-  forceRenewal?: boolean;
+  input: {
+    mode: 'certonly';
+    /** 証明書に含めるドメイン */
+    domains: string[];
+    /** 連絡先メールアドレス */
+    email: string;
+    /** ACME サーバー URL */
+    server: string;
+    /** DNS 検証用の Route53 ホストゾーン ID */
+    route53HostedZoneId: string;
+    /** 再インポート用の既存 ACM 証明書 ARN（新規の場合は null） */
+    acmCertificateArn?: string | null;
+    /** 証明書のキータイプ @default 'rsa' */
+    keyType?: KeyType;
+    /** RSA キーサイズ @default 2048 */
+    rsaKeySize?: 2048 | 4096;
+    /** 有効期限前でも強制的に更新するか */
+    forceRenewal?: boolean;
+  };
 }
 
 /**
@@ -226,11 +230,13 @@ export interface CertonlyPayload {
  * domains.json に基づく自動更新
  */
 export interface RenewPayload {
-  mode: 'renew';
-  /** 更新対象の証明書 ID リスト（未指定の場合は有効なすべての証明書） */
-  certificateIds?: string[];
-  /** ドライランモード（実際の変更は行わない） */
-  dryRun?: boolean;
+  input: {
+    mode: 'renew';
+    /** 更新対象の証明書 ID リスト（未指定の場合は有効なすべての証明書） */
+    certificateIds?: string[];
+    /** ドライランモード（実際の変更は行わない） */
+    dryRun?: boolean;
+  };
 }
 
 /**

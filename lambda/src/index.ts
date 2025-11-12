@@ -36,7 +36,7 @@ export const handler: Handler<LambdaEvent, LambdaResponse> = async (event) => {
   console.log('Event:', JSON.stringify(event, null, 2));
 
   // イベントペイロードから動作モードを取得
-  const mode = event.mode;
+  const mode = event.input.mode;
 
   // モードが指定されていない場合はエラー
   if (!mode) {
@@ -72,8 +72,8 @@ export const handler: Handler<LambdaEvent, LambdaResponse> = async (event) => {
  */
 async function handleRegisterMode(event: RegisterPayload): Promise<LambdaResponse> {
   console.log('=== REGISTER MODE ===');
-  console.log(`Email: ${event.email}`);
-  console.log(`Server: ${event.server}`);
+  console.log(`Email: ${event.input.email}`);
+  console.log(`Server: ${event.input.server}`);
 
   // 環境変数から S3 バケット名と SNS トピック ARN を取得
   const bucketName = process.env.CERTIFICATE_BUCKET;
@@ -110,7 +110,7 @@ async function handleRegisterMode(event: RegisterPayload): Promise<LambdaRespons
 
     // 成功通知を SNS 経由で送信
     await notifier.sendSuccess(
-      `ACME account registered successfully for ${event.email} on ${event.server}`
+      `ACME account registered successfully for ${event.input.email} on ${event.input.server}`
     );
 
     // 成功レスポンスを返却
@@ -164,9 +164,9 @@ async function handleRegisterMode(event: RegisterPayload): Promise<LambdaRespons
  */
 async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaResponse> {
   console.log('=== CERTONLY MODE ===');
-  console.log(`Domains: ${event.domains.join(', ')}`);
-  console.log(`Email: ${event.email}`);
-  console.log(`Server: ${event.server}`);
+  console.log(`Domains: ${event.input.domains.join(', ')}`);
+  console.log(`Email: ${event.input.email}`);
+  console.log(`Server: ${event.input.server}`);
 
   // 環境変数から S3 バケット名と SNS トピック ARN を取得
   const bucketName = process.env.CERTIFICATE_BUCKET;
@@ -196,7 +196,7 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
     const certPaths = await certbotRunner.obtainCertificateFromPayload(event);
 
     // 証明書 ID を生成（手動取得の場合は "manual-" プレフィックスを付与）
-    const certId = `manual-${event.domains[0].replace(/[^a-zA-Z0-9]/g, '-')}`;
+    const certId = `manual-${event.input.domains[0].replace(/[^a-zA-Z0-9]/g, '-')}`;
 
     // 取得した証明書ファイルを S3 にバックアップ（タイムスタンプ付き）
     console.log('Backing up certificate to S3...');
@@ -213,7 +213,7 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
     const acmArn = await certificateManager.importCertificate(
       certPaths,
       certId,
-      event.acmCertificateArn || null
+      event.input.acmCertificateArn || null
     );
 
     // ACM から証明書情報を取得（有効期限などのメタデータ）
@@ -246,16 +246,16 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
     // 新しい証明書設定を作成
     const newCertConfig: CertificateConfig = {
       id: certId,
-      domains: event.domains,
-      email: event.email,
+      domains: event.input.domains,
+      email: event.input.email,
       acmeProvider: 'custom', // カスタムサーバー URL を使用
-      acmeServerUrl: event.server,
-      route53HostedZoneId: event.route53HostedZoneId,
+      acmeServerUrl: event.input.server,
+      route53HostedZoneId: event.input.route53HostedZoneId,
       acmCertificateArn: acmArn,
       renewDaysBeforeExpiry: 30, // 有効期限の 30 日前に更新
       enabled: true, // 自動更新を有効化
-      keyType: event.keyType || 'rsa', // RSA または ECDSA
-      rsaKeySize: event.rsaKeySize, // RSA キーサイズ（指定がある場合）
+      keyType: event.input.keyType || 'rsa', // RSA または ECDSA
+      rsaKeySize: event.input.rsaKeySize, // RSA キーサイズ（指定がある場合）
     };
 
     // 証明書設定を配列に追加
@@ -271,13 +271,13 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
 
     // 成功通知を SNS 経由で送信
     await notifier.sendSuccess(
-      `Certificate obtained successfully for ${event.domains.join(', ')}\nACM ARN: ${acmArn}\nAdded to domains.json for automatic renewal`
+      `Certificate obtained successfully for ${event.input.domains.join(', ')}\nACM ARN: ${acmArn}\nAdded to domains.json for automatic renewal`
     );
 
     // 処理結果を作成
     const result: RenewalResult = {
       certificateId: certId,
-      domains: event.domains,
+      domains: event.input.domains,
       success: true,
       acmCertificateArn: acmArn,
       expiryDate: certInfo?.notAfter,
@@ -304,8 +304,8 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
 
     // エラー結果を作成
     const result: RenewalResult = {
-      certificateId: `manual-${event.domains[0].replace(/[^a-zA-Z0-9]/g, '-')}`,
-      domains: event.domains,
+      certificateId: `manual-${event.input.domains[0].replace(/[^a-zA-Z0-9]/g, '-')}`,
+      domains: event.input.domains,
       success: false,
       error: error.message,
     };
@@ -340,7 +340,7 @@ async function handleCertonlyMode(event: CertonlyPayload): Promise<LambdaRespons
  */
 async function handleRenewMode(event: RenewPayload): Promise<LambdaResponse> {
   console.log('=== RENEW MODE ===');
-  console.log(`Dry run: ${event.dryRun || false}`);
+  console.log(`Dry run: ${event.input.dryRun || false}`);
 
   // 環境変数を取得
   const bucketName = process.env.CERTIFICATE_BUCKET;
@@ -391,7 +391,7 @@ async function handleRenewMode(event: RenewPayload): Promise<LambdaResponse> {
       }
 
       // イベントペイロードで証明書 ID フィルタが指定されている場合、対象外はスキップ
-      if (event.certificateIds && !event.certificateIds.includes(certConfig.id)) {
+      if (event.input.certificateIds && !event.input.certificateIds.includes(certConfig.id)) {
         console.log(`Skipping certificate not in event filter: ${certConfig.id}`);
         continue;
       }
@@ -402,7 +402,7 @@ async function handleRenewMode(event: RenewPayload): Promise<LambdaResponse> {
         s3Manager,
         certbotRunner,
         certificateManager,
-        event.dryRun || false
+        event.input.dryRun || false
       );
 
       results.push(result);

@@ -206,7 +206,9 @@ export class CertificateLambda extends Construct {
     rule.addTarget(
       new targets.LambdaFunction(this.function, {
         event: events.RuleTargetInput.fromObject({
-          mode: 'renew', // 自動更新モード
+          input: {
+            mode: 'renew', // 自動更新モード
+          },
         }),
       })
     );

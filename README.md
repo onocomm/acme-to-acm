@@ -152,11 +152,13 @@ JPRS などの EAB が必要なプロバイダーで最初にアカウントを�
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "register",
-    "email": "admin@example.com",
-    "server": "https://acme.jprs.jp/directory",
-    "eabKid": "YOUR_TEMPORARY_EAB_KID",
-    "eabHmacKey": "YOUR_TEMPORARY_EAB_HMAC_KEY"
+    "input": {
+      "mode": "register",
+      "email": "admin@example.com",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "eabKid": "YOUR_TEMPORARY_EAB_KID",
+      "eabHmacKey": "YOUR_TEMPORARY_EAB_HMAC_KEY"
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -176,13 +178,15 @@ cat response.json
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "certonly",
-    "domains": ["example.com", "*.example.com"],
-    "email": "admin@example.com",
-    "server": "https://acme.jprs.jp/directory",
-    "route53HostedZoneId": "Z1234567890ABC",
-    "keyType": "rsa",
-    "rsaKeySize": 2048
+    "input": {
+      "mode": "certonly",
+      "domains": ["example.com", "*.example.com"],
+      "email": "admin@example.com",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "route53HostedZoneId": "Z1234567890ABC",
+      "keyType": "rsa",
+      "rsaKeySize": 2048
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -191,15 +195,17 @@ aws lambda invoke \
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "certonly",
-    "domains": ["example.com", "*.example.com"],
-    "email": "admin@example.com",
-    "server": "https://acme.jprs.jp/directory",
-    "route53HostedZoneId": "Z1234567890ABC",
-    "acmCertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/existing-cert-id",
-    "keyType": "rsa",
-    "rsaKeySize": 2048,
-    "forceRenewal": true
+    "input": {
+      "mode": "certonly",
+      "domains": ["example.com", "*.example.com"],
+      "email": "admin@example.com",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "route53HostedZoneId": "Z1234567890ABC",
+      "acmCertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/existing-cert-id",
+      "keyType": "rsa",
+      "rsaKeySize": 2048,
+      "forceRenewal": true
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -208,12 +214,14 @@ aws lambda invoke \
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "certonly",
-    "domains": ["test.example.org"],
-    "email": "webmaster@example.org",
-    "server": "https://acme-v02.api.letsencrypt.org/directory",
-    "route53HostedZoneId": "ZLETENCRYPT456",
-    "keyType": "ecdsa"
+    "input": {
+      "mode": "certonly",
+      "domains": ["test.example.org"],
+      "email": "webmaster@example.org",
+      "server": "https://acme-v02.api.letsencrypt.org/directory",
+      "route53HostedZoneId": "ZLETENCRYPT456",
+      "keyType": "ecdsa"
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -227,7 +235,7 @@ domains.json の設定に基づいて証明書を更新します（週次スケ�
 # 全ての有効な証明書を処理（自動実行と同じ）
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
-  --payload '{"mode": "renew"}' \
+  --payload '{"input": {"mode": "renew"}}' \
   --region us-east-1 \
   response.json
 
@@ -235,8 +243,10 @@ aws lambda invoke \
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "renew",
-    "certificateIds": ["example-com", "another-domain"]
+    "input": {
+      "mode": "renew",
+      "certificateIds": ["example-com", "another-domain"]
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -245,8 +255,10 @@ aws lambda invoke \
 aws lambda invoke \
   --function-name AcmeToAcmCertificateRenewer \
   --payload '{
-    "mode": "renew",
-    "dryRun": true
+    "input": {
+      "mode": "renew",
+      "dryRun": true
+    }
   }' \
   --region us-east-1 \
   response.json
@@ -305,7 +317,7 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
 
 1. **JPRS** (`acmeProvider: "jprs"`)
    - JPRS の ACME サーバー
-   - URL: `https://acme.jprs.jp/directory`
+   - URL: `https://acme.amecert.jprs.jp/DV/getDirector`
 
 2. **Let's Encrypt** (`acmeProvider: "letsencrypt"`)
    - 本番環境用

@@ -279,7 +279,7 @@ aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
 aws lambda invoke --region us-east-1 \
   --function-name AcmeToAcmCertificateRenewer \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"mode":"renew","dryRun":true}' \
+  --payload '{"input":{"mode":"renew","dryRun":true}}' \
   response.json
 ```
 
@@ -292,28 +292,28 @@ All Lambda invocations must specify `--region us-east-1` and `--cli-binary-forma
 aws lambda invoke --region us-east-1 \
   --function-name AcmeToAcmCertificateRenewer \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"mode":"register","email":"admin@example.com","server":"https://acme.jprs.jp/directory","eabKid":"TEMP_KID","eabHmacKey":"TEMP_KEY"}' \
+  --payload '{"input":{"mode":"register","email":"admin@example.com","server":"https://acme.amecert.jprs.jp/DV/getDirector","eabKid":"TEMP_KID","eabHmacKey":"TEMP_KEY"}}' \
   response.json
 
 # Obtain certificate manually
 aws lambda invoke --region us-east-1 \
   --function-name AcmeToAcmCertificateRenewer \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"mode":"certonly","domains":["example.com","*.example.com"],"email":"admin@example.com","server":"https://acme.jprs.jp/directory","route53HostedZoneId":"Z123","keyType":"rsa","rsaKeySize":2048}' \
+  --payload '{"input":{"mode":"certonly","domains":["example.com","*.example.com"],"email":"admin@example.com","server":"https://acme.amecert.jprs.jp/DV/getDirector","route53HostedZoneId":"Z123","keyType":"rsa","rsaKeySize":2048}}' \
   response.json
 
 # Manual renewal (all enabled certificates)
 aws lambda invoke --region us-east-1 \
   --function-name AcmeToAcmCertificateRenewer \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"mode":"renew"}' \
+  --payload '{"input":{"mode":"renew"}}' \
   response.json
 
 # Dry run renewal
 aws lambda invoke --region us-east-1 \
   --function-name AcmeToAcmCertificateRenewer \
   --cli-binary-format raw-in-base64-out \
-  --payload '{"mode":"renew","dryRun":true}' \
+  --payload '{"input":{"mode":"renew","dryRun":true}}' \
   response.json
 ```
 

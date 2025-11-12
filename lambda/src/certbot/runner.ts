@@ -68,18 +68,18 @@ export class CertbotRunner {
    * @throws Certbot コマンドが失敗した場合にエラーをスロー
    */
   async registerAccount(payload: RegisterPayload): Promise<void> {
-    console.log(`Registering ACME account for ${payload.email}`);
-    console.log(`Server: ${payload.server}`);
+    console.log(`Registering ACME account for ${payload.input.email}`);
+    console.log(`Server: ${payload.input.server}`);
 
     // Certbot register コマンドの引数を構築
     const args = [
       'certbot register',
       '--non-interactive', // 対話モード無効（Lambda に必須）
       '--agree-tos', // 利用規約に自動同意
-      `-m ${payload.email}`, // メールアドレス
-      `--server ${payload.server}`, // ACME サーバー URL
-      `--eab-kid ${payload.eabKid}`, // EAB Key Identifier
-      `--eab-hmac-key ${payload.eabHmacKey}`, // EAB HMAC Key
+      `-m ${payload.input.email}`, // メールアドレス
+      `--server ${payload.input.server}`, // ACME サーバー URL
+      `--eab-kid ${payload.input.eabKid}`, // EAB Key Identifier
+      `--eab-hmac-key ${payload.input.eabHmacKey}`, // EAB HMAC Key
       `--config-dir ${this.configDir}`, // 設定保存先
       `--work-dir ${this.workDir}`, // 作業ディレクトリ
       `--logs-dir ${this.logsDir}`, // ログ出力先
@@ -178,18 +178,18 @@ export class CertbotRunner {
    * @throws Certbot コマンドが失敗した場合にエラーをスロー
    */
   async obtainCertificateFromPayload(payload: CertonlyPayload): Promise<CertbotCertificatePaths> {
-    console.log(`Obtaining certificate for ${payload.domains.join(', ')}`);
-    console.log(`Server: ${payload.server}`);
+    console.log(`Obtaining certificate for ${payload.input.domains.join(', ')}`);
+    console.log(`Server: ${payload.input.server}`);
 
     // Certbot certonly コマンドを構築
     const command = this.buildCertbotCommand({
-      domains: payload.domains,
-      email: payload.email,
-      serverUrl: payload.server,
-      route53HostedZoneId: payload.route53HostedZoneId,
-      forceRenewal: payload.forceRenewal || false,
-      keyType: payload.keyType,
-      rsaKeySize: payload.rsaKeySize,
+      domains: payload.input.domains,
+      email: payload.input.email,
+      serverUrl: payload.input.server,
+      route53HostedZoneId: payload.input.route53HostedZoneId,
+      forceRenewal: payload.input.forceRenewal || false,
+      keyType: payload.input.keyType,
+      rsaKeySize: payload.input.rsaKeySize,
     });
 
     console.log(`Executing: ${command}`);
@@ -209,7 +209,7 @@ export class CertbotRunner {
       console.log('Certbot output:', output);
 
       // 取得した証明書ファイルのパスを解決
-      const certPaths = this.getCertificatePaths(payload.domains[0]);
+      const certPaths = this.getCertificatePaths(payload.input.domains[0]);
 
       console.log('Certificate obtained successfully');
       console.log('Paths:', certPaths);
