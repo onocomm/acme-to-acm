@@ -238,6 +238,8 @@ Use the `AWS_PROFILE` environment variable for all commands:
 
 ```bash
 # Bootstrap (first time only)
+# Replace ACCOUNT-ID with your 12-digit AWS account ID
+# To find account ID: AWS_PROFILE=production aws sts get-caller-identity --query Account --output text
 AWS_PROFILE=production cdk bootstrap aws://ACCOUNT-ID/us-east-1
 
 # Deploy
@@ -256,6 +258,7 @@ Pass the `--profile` option directly to CDK commands:
 
 ```bash
 # Bootstrap (first time only)
+# Replace ACCOUNT-ID with your 12-digit AWS account ID
 cdk bootstrap aws://ACCOUNT-ID/us-east-1 --profile production
 
 # Build then deploy

@@ -163,7 +163,8 @@ aws_secret_access_key = ...
 
 ```bash
 # Bootstrap（初回のみ）
-AWS_PROFILE=production cdk bootstrap
+# ACCOUNT-ID は対象アカウントの AWS アカウント ID（12桁の数字）に置き換えてください
+AWS_PROFILE=production cdk bootstrap aws://ACCOUNT-ID/us-east-1
 
 # デプロイ
 AWS_PROFILE=production npm run deploy
@@ -181,7 +182,8 @@ CDK コマンドに直接 `--profile` オプションを指定：
 
 ```bash
 # Bootstrap（初回のみ）
-cdk bootstrap --profile production
+# ACCOUNT-ID は対象アカウントの AWS アカウント ID（12桁の数字）に置き換えてください
+cdk bootstrap aws://ACCOUNT-ID/us-east-1 --profile production
 
 # デプロイ（ビルドしてから）
 npm run build
@@ -208,6 +210,8 @@ AWS_PROFILE=account-b STACK_SUFFIX=-letsencrypt npm run deploy
 
 - **リージョン固定**: CloudFront 証明書の要件により、常に `us-east-1` にデプロイされます
 - **Bootstrap**: 各アカウント・リージョンで初回のみ `cdk bootstrap` が必要です
+- **Bootstrap のアカウント ID**: `aws://ACCOUNT-ID/us-east-1` の ACCOUNT-ID は、デプロイ先のアカウント ID（12桁の数字）に置き換えてください
+  - アカウント ID の確認方法: `AWS_PROFILE=プロファイル名 aws sts get-caller-identity --query Account --output text`
 - **Lambda 実行**: デプロイ後の Lambda 実行時も同じプロファイルを指定してください
 
 ```bash
