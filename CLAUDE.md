@@ -302,6 +302,79 @@ AWS_PROFILE=production aws lambda invoke \
 - **Bootstrap**: Each account/region requires one-time `cdk bootstrap`
 - **Account Detection**: `process.env.CDK_DEFAULT_ACCOUNT` in bin/acme-to-acm.ts automatically detects the account from the specified profile
 
+## Multi-Region Deployment
+
+The project supports deployment to multiple AWS regions for different use cases.
+
+### Default Region (CloudFront)
+
+By default, the stack deploys to `us-east-1` for CloudFront certificate requirements (AWS requirement).
+
+```bash
+# Default (us-east-1)
+npm run deploy
+```
+
+### Deploy to Other Regions (ALB/ELB)
+
+For ALB, NLB, API Gateway, etc., certificates must be in the same region as the resource. Use the `CDK_DEPLOY_REGION` environment variable to specify the region.
+
+```bash
+# Deploy to ap-northeast-1 (Tokyo)
+CDK_DEPLOY_REGION=ap-northeast-1 npm run deploy
+
+# Deploy to eu-west-1 (Ireland)
+CDK_DEPLOY_REGION=eu-west-1 npm run deploy
+
+# Bootstrap for the target region (first time only)
+CDK_DEPLOY_REGION=ap-northeast-1 cdk bootstrap aws://ACCOUNT-ID/ap-northeast-1
+```
+
+### Combined Deployment Examples
+
+```bash
+# CloudFront stack in us-east-1
+AWS_PROFILE=account-a STACK_SUFFIX=-cloudfront npm run deploy
+
+# ALB stack in ap-northeast-1 (Tokyo)
+AWS_PROFILE=account-a CDK_DEPLOY_REGION=ap-northeast-1 STACK_SUFFIX=-alb-tokyo npm run deploy
+
+# ALB stack in eu-west-1 (Ireland)
+AWS_PROFILE=account-b CDK_DEPLOY_REGION=eu-west-1 STACK_SUFFIX=-alb-ireland npm run deploy
+```
+
+### Lambda Invocation
+
+When invoking Lambda functions, specify the correct region:
+
+```bash
+# Invoke Lambda in ap-northeast-1
+aws lambda invoke \
+  --region ap-northeast-1 \
+  --function-name AcmeToAcmCertificateRenewer \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"input":{"mode":"certonly",...}}' \
+  response.json
+```
+
+### CloudWatch Logs
+
+Each region has separate log groups:
+
+```bash
+# Tail logs in ap-northeast-1
+aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
+  --follow \
+  --region ap-northeast-1
+```
+
+### Important Notes
+
+- **CloudFront certificates**: Must be in `us-east-1` (AWS requirement)
+- **ALB/NLB certificates**: Must be in the same region as the load balancer
+- **Region Detection**: `process.env.CDK_DEPLOY_REGION` or `process.env.AWS_REGION` in bin/acme-to-acm.ts (defaults to `us-east-1`)
+- **Backward Compatibility**: Existing deployments remain in `us-east-1` (no environment variable = default)
+
 ## Troubleshooting
 
 ### Docker Build Issues

@@ -27,12 +27,16 @@ new AcmeToAcmStack(app, `AcmeToAcmStack${stackSuffix}`, {
   /**
    * デプロイ先の AWS アカウントとリージョン
    *
-   * 重要: CloudFront で使用する証明書は us-east-1 リージョンの ACM にインポートする必要がある
-   * これは AWS CloudFront の仕様による制約
+   * リージョン指定:
+   * - CloudFront 用: us-east-1（デフォルト）
+   * - ALB/ELB 用: 環境変数 CDK_DEPLOY_REGION または AWS_REGION で指定
+   *   例: CDK_DEPLOY_REGION=ap-northeast-1 npm run deploy
+   *
+   * 重要: CloudFront で使用する証明書は必ず us-east-1 にデプロイしてください
    */
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT, // 現在の AWS アカウント ID
-    region: 'us-east-1', // 必須リージョン（CloudFront 証明書用）
+    region: process.env.CDK_DEPLOY_REGION || process.env.AWS_REGION || 'us-east-1', // デフォルトは us-east-1（CloudFront 用）
   },
 
   /**

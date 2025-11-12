@@ -224,6 +224,67 @@ AWS_PROFILE=production aws lambda invoke \
   response.json
 ```
 
+## マルチリージョンデプロイ
+
+### デフォルトリージョン（CloudFront 用）
+
+デフォルトでは `us-east-1` にデプロイされます。CloudFront ディストリビューションで使用する証明書は必ず us-east-1 にインポートする必要があります。
+
+```bash
+# デフォルト（us-east-1）
+npm run deploy
+```
+
+### 別リージョンへのデプロイ（ALB/ELB 用）
+
+ALB、NLB、API Gateway などで使用する証明書は、リソースと同じリージョンに配置する必要があります。環境変数 `CDK_DEPLOY_REGION` でリージョンを指定できます。
+
+```bash
+# ap-northeast-1（東京）にデプロイ
+CDK_DEPLOY_REGION=ap-northeast-1 npm run deploy
+
+# eu-west-1（アイルランド）にデプロイ
+CDK_DEPLOY_REGION=eu-west-1 npm run deploy
+
+# Bootstrap も同じリージョンで実行（初回のみ）
+CDK_DEPLOY_REGION=ap-northeast-1 cdk bootstrap aws://ACCOUNT-ID/ap-northeast-1
+```
+
+### マルチリージョン + マルチアカウント + マルチスタック
+
+すべてを組み合わせることも可能：
+
+```bash
+# アカウント A の us-east-1 に CloudFront 用スタックをデプロイ
+AWS_PROFILE=account-a STACK_SUFFIX=-cloudfront npm run deploy
+
+# アカウント A の ap-northeast-1 に ALB 用スタックをデプロイ
+AWS_PROFILE=account-a CDK_DEPLOY_REGION=ap-northeast-1 STACK_SUFFIX=-alb-tokyo npm run deploy
+
+# アカウント B の eu-west-1 に ALB 用スタックをデプロイ
+AWS_PROFILE=account-b CDK_DEPLOY_REGION=eu-west-1 STACK_SUFFIX=-alb-ireland npm run deploy
+```
+
+### 注意事項
+
+- **CloudFront 証明書**: 必ず `us-east-1` にデプロイしてください（AWS の仕様）
+- **ALB/NLB 証明書**: ALB/NLB と同じリージョンにデプロイしてください
+- **Lambda 実行**: リージョンを指定してください
+  ```bash
+  aws lambda invoke \
+    --function-name AcmeToAcmCertificateRenewer \
+    --region ap-northeast-1 \
+    --cli-binary-format raw-in-base64-out \
+    --payload '{"input":{"mode":"certonly",...}}' \
+    response.json
+  ```
+- **CloudWatch Logs**: リージョンごとに別のロググループが作成されます
+  ```bash
+  aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
+    --follow \
+    --region ap-northeast-1
+  ```
+
 ## 使い方
 
 このシステムは3つのモードで動作します：
