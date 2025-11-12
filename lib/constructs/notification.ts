@@ -19,14 +19,14 @@ import { Construct } from 'constructs';
 
 /**
  * CertificateNotification Construct のプロパティ
- *
- * 現在は未使用だが、将来の拡張のために定義
- * （例: デフォルトのメールアドレス、通知フィルターなど）
  */
 export interface CertificateNotificationProps {
   /**
-   * 将来の設定オプション用のプレースホルダー
+   * リソース名のサフィックス（オプション）
+   * 複数スタックを同一アカウントにデプロイする場合に使用
+   * @default '' (空文字列)
    */
+  stackNameSuffix?: string;
 }
 
 /**
@@ -49,7 +49,7 @@ export class CertificateNotification extends Construct {
     // Lambda 関数がこのトピックに更新結果をパブリッシュする
     this.topic = new sns.Topic(this, 'NotificationTopic', {
       displayName: 'ACME to ACM Certificate Renewal Notifications', // 表示名
-      topicName: 'AcmeToAcmNotifications', // トピック名
+      topicName: `AcmeToAcmNotifications${props?.stackNameSuffix || ''}`, // トピック名
     });
 
     // 注意: メールサブスクリプションは管理者が手動で追加する必要がある
@@ -68,14 +68,14 @@ export class CertificateNotification extends Construct {
     new cdk.CfnOutput(this, 'TopicArn', {
       value: this.topic.topicArn,
       description: 'SNS topic ARN for certificate notifications',
-      exportName: 'AcmeToAcmTopicArn',
+      exportName: `AcmeToAcmTopicArn${props?.stackNameSuffix || ''}`,
     });
 
     // トピック名を出力（参照用）
     new cdk.CfnOutput(this, 'TopicName', {
       value: this.topic.topicName,
       description: 'SNS topic name',
-      exportName: 'AcmeToAcmTopicName',
+      exportName: `AcmeToAcmTopicName${props?.stackNameSuffix || ''}`,
     });
   }
 }

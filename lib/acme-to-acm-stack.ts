@@ -49,6 +49,14 @@ export interface AcmeToAcmStackProps extends cdk.StackProps {
    * @default true
    */
   enableSchedule?: boolean;
+
+  /**
+   * リソース名のサフィックス（オプション）
+   * 複数スタックを同一アカウントにデプロイする場合に使用
+   * 例: "-userA", "-projectB"
+   * @default '' (空文字列)
+   */
+  stackNameSuffix?: string;
 }
 
 /**
@@ -63,11 +71,15 @@ export class AcmeToAcmStack extends cdk.Stack {
 
     // S3 バケットを作成（証明書ストレージ用）
     // Certbot 設定、domains.json、証明書バックアップを保存する
-    const storage = new CertificateStorage(this, 'Storage');
+    const storage = new CertificateStorage(this, 'Storage', {
+      bucketNameSuffix: props?.stackNameSuffix,
+    });
 
     // SNS トピックを作成（通知用）
     // 証明書更新の成功/失敗をメール通知する
-    const notification = new CertificateNotification(this, 'Notification');
+    const notification = new CertificateNotification(this, 'Notification', {
+      stackNameSuffix: props?.stackNameSuffix,
+    });
 
     // Lambda 関数を作成（証明書更新処理用）
     // Docker イメージベースの Lambda で Certbot を実行し、
@@ -78,6 +90,7 @@ export class AcmeToAcmStack extends cdk.Stack {
       domainConfigKey: props?.domainConfigKey, // domains.json のパス
       scheduleExpression: props?.scheduleExpression, // 自動更新スケジュール
       enableSchedule: props?.enableSchedule, // スケジュール有効化フラグ
+      stackNameSuffix: props?.stackNameSuffix, // リソース名サフィックス
     });
 
     // CloudFormation Outputs を追加

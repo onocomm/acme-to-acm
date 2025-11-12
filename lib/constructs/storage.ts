@@ -85,14 +85,14 @@ export class CertificateStorage extends Construct {
     new cdk.CfnOutput(this, 'BucketName', {
       value: this.bucket.bucketName,
       description: 'S3 bucket for certificate storage',
-      exportName: 'AcmeToAcmBucketName',
+      exportName: `AcmeToAcmBucketName${props?.bucketNameSuffix || ''}`,
     });
 
     // バケット ARN を出力（IAM ポリシーなどで使用）
     new cdk.CfnOutput(this, 'BucketArn', {
       value: this.bucket.bucketArn,
       description: 'S3 bucket ARN',
-      exportName: 'AcmeToAcmBucketArn',
+      exportName: `AcmeToAcmBucketArn${props?.bucketNameSuffix || ''}`,
     });
   }
 }

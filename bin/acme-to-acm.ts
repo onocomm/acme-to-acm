@@ -18,8 +18,12 @@ import { AcmeToAcmStack } from '../lib/acme-to-acm-stack';
 // CDK アプリケーションを作成
 const app = new cdk.App();
 
+// スタック名サフィックスを環境変数から取得（オプション）
+// 複数スタックをデプロイする場合に使用（例: STACK_SUFFIX=-jprs, STACK_SUFFIX=-letsencrypt）
+const stackSuffix = process.env.STACK_SUFFIX || '';
+
 // ACME to ACM スタックを作成してデプロイ
-new AcmeToAcmStack(app, 'AcmeToAcmStack', {
+new AcmeToAcmStack(app, `AcmeToAcmStack${stackSuffix}`, {
   /**
    * デプロイ先の AWS アカウントとリージョン
    *
@@ -76,4 +80,10 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
     Project: 'AcmeToAcm', // プロジェクト名
     ManagedBy: 'CDK', // CDK による管理を示す
   },
+
+  /**
+   * リソース名のサフィックス（環境変数 STACK_SUFFIX から取得）
+   * 複数スタックを同一アカウントにデプロイする場合に使用
+   */
+  stackNameSuffix: stackSuffix,
 });

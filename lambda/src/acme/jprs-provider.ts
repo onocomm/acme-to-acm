@@ -17,7 +17,7 @@ import { AcmeProviderConfig } from '../types/domain-config';
  */
 export const JPRS_PROVIDER: AcmeProviderConfig = {
   name: 'jprs',
-  serverUrl: 'https://acme.amecert.jprs.jp/DV/getDirector', // JPRS ACME サーバー URL
+  serverUrl: 'https://acme.amecert.jprs.jp/DV/getDirectory', // JPRS ACME サーバー URL
   eabRequired: false, // EAB は必須だが、ここでは false（register モードで処理）
 };
 

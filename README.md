@@ -155,7 +155,7 @@ aws lambda invoke \
     "input": {
       "mode": "register",
       "email": "admin@example.com",
-      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirectory",
       "eabKid": "YOUR_TEMPORARY_EAB_KID",
       "eabHmacKey": "YOUR_TEMPORARY_EAB_HMAC_KEY"
     }
@@ -182,7 +182,7 @@ aws lambda invoke \
       "mode": "certonly",
       "domains": ["example.com", "*.example.com"],
       "email": "admin@example.com",
-      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirectory",
       "route53HostedZoneId": "Z1234567890ABC",
       "keyType": "rsa",
       "rsaKeySize": 2048
@@ -199,7 +199,7 @@ aws lambda invoke \
       "mode": "certonly",
       "domains": ["example.com", "*.example.com"],
       "email": "admin@example.com",
-      "server": "https://acme.amecert.jprs.jp/DV/getDirector",
+      "server": "https://acme.amecert.jprs.jp/DV/getDirectory",
       "route53HostedZoneId": "Z1234567890ABC",
       "acmCertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/existing-cert-id",
       "keyType": "rsa",
@@ -317,7 +317,7 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
 
 1. **JPRS** (`acmeProvider: "jprs"`)
    - JPRS の ACME サーバー
-   - URL: `https://acme.amecert.jprs.jp/DV/getDirector`
+   - URL: `https://acme.amecert.jprs.jp/DV/getDirectory`
 
 2. **Let's Encrypt** (`acmeProvider: "letsencrypt"`)
    - 本番環境用

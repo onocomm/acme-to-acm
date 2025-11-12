@@ -51,6 +51,13 @@ export interface CertificateLambdaProps {
    * @default true
    */
   enableSchedule?: boolean;
+
+  /**
+   * リソース名のサフィックス（オプション）
+   * 複数スタックを同一アカウントにデプロイする場合に使用
+   * @default '' (空文字列)
+   */
+  stackNameSuffix?: string;
 }
 
 /**
@@ -77,7 +84,7 @@ export class CertificateLambda extends Construct {
     // Docker イメージから Lambda 関数を作成
     // lambda/ ディレクトリの Dockerfile を使用してビルド
     this.function = new lambda.DockerImageFunction(this, 'RenewalFunction', {
-      functionName: 'AcmeToAcmCertificateRenewer',
+      functionName: `AcmeToAcmCertificateRenewer${props.stackNameSuffix || ''}`,
       description: 'ACME certificate renewal and ACM import',
       code: lambda.DockerImageCode.fromImageAsset(
         path.join(__dirname, '../../lambda'), // lambda/ ディレクトリを指定
@@ -103,20 +110,20 @@ export class CertificateLambda extends Construct {
 
     // EventBridge スケジュールを作成（有効な場合）
     if (enableSchedule) {
-      this.createSchedule(scheduleExpression);
+      this.createSchedule(scheduleExpression, props.stackNameSuffix || '');
     }
 
     // CloudFormation Outputs を追加
     new cdk.CfnOutput(this, 'FunctionArn', {
       value: this.function.functionArn,
       description: 'Lambda function ARN',
-      exportName: 'AcmeToAcmFunctionArn',
+      exportName: `AcmeToAcmFunctionArn${props.stackNameSuffix || ''}`,
     });
 
     new cdk.CfnOutput(this, 'FunctionName', {
       value: this.function.functionName,
       description: 'Lambda function name',
-      exportName: 'AcmeToAcmFunctionName',
+      exportName: `AcmeToAcmFunctionName${props.stackNameSuffix || ''}`,
     });
   }
 
@@ -192,11 +199,12 @@ export class CertificateLambda extends Construct {
    * デフォルトは毎週日曜日 2:00 JST（UTC 土曜日 17:00）。
    *
    * @param scheduleExpression - EventBridge cron 式
+   * @param stackNameSuffix - スタック名サフィックス
    */
-  private createSchedule(scheduleExpression: string): void {
+  private createSchedule(scheduleExpression: string, stackNameSuffix: string): void {
     // EventBridge Rule を作成
     const rule = new events.Rule(this, 'WeeklyRenewalSchedule', {
-      ruleName: 'AcmeToAcmWeeklyCheck',
+      ruleName: `AcmeToAcmWeeklyCheck${stackNameSuffix}`,
       description: 'Weekly certificate renewal check',
       schedule: events.Schedule.expression(scheduleExpression),
     });
