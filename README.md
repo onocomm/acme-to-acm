@@ -574,6 +574,7 @@ docker build -t acme-to-acm-test .
 - ✅ IAM 最小権限の原則
 - ✅ ACM 証明書と秘密鍵の暗号化保存
 - ✅ CloudWatch Logs での監査ログ記録
+- ✅ コマンドインジェクション対策（`execFileSync` による引数配列渡し）
 
 ## コスト
 

@@ -6,7 +6,7 @@
  * ファイルパス解決などの機能を提供する。
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -71,27 +71,26 @@ export class CertbotRunner {
     console.log(`Registering ACME account for ${payload.input.email}`);
     console.log(`Server: ${payload.input.server}`);
 
-    // Certbot register コマンドの引数を構築
+    // Certbot register コマンドの引数を配列で構築（コマンドインジェクション対策）
     const args = [
-      'certbot register',
+      'register',
       '--non-interactive', // 対話モード無効（Lambda に必須）
       '--agree-tos', // 利用規約に自動同意
-      `-m ${payload.input.email}`, // メールアドレス
-      `--server ${payload.input.server}`, // ACME サーバー URL
-      `--eab-kid ${payload.input.eabKid}`, // EAB Key Identifier
-      `--eab-hmac-key ${payload.input.eabHmacKey}`, // EAB HMAC Key
-      `--config-dir ${this.configDir}`, // 設定保存先
-      `--work-dir ${this.workDir}`, // 作業ディレクトリ
-      `--logs-dir ${this.logsDir}`, // ログ出力先
+      '-m', payload.input.email, // メールアドレス
+      '--server', payload.input.server, // ACME サーバー URL
+      '--eab-kid', payload.input.eabKid, // EAB Key Identifier
+      '--eab-hmac-key', payload.input.eabHmacKey, // EAB HMAC Key
+      '--config-dir', this.configDir, // 設定保存先
+      '--work-dir', this.workDir, // 作業ディレクトリ
+      '--logs-dir', this.logsDir, // ログ出力先
     ];
 
-    const command = args.join(' ');
     // EAB 認証情報をログに出力しないよう注意
     console.log('Executing: certbot register (EAB credentials hidden)');
 
     try {
-      // Certbot register コマンドを同期実行
-      const output = execSync(command, {
+      // Certbot register コマンドを同期実行（execFileSync でシェル経由しない）
+      const output = execFileSync('certbot', args, {
         encoding: 'utf-8',
         stdio: 'pipe', // 出力をキャプチャ
       });
@@ -113,6 +112,7 @@ export class CertbotRunner {
    * domains.json の設定から証明書を取得する。
    * Route53 DNS-01 チャレンジを使用して自動的にドメイン所有権を検証。
    * ACM ARN が既に存在する場合は --force-renewal フラグを使用して強制更新。
+   * --cert-name オプションで lineage 名を固定し、番号付きディレクトリの発生を防止。
    *
    * @param config - domains.json からの証明書設定
    * @returns 取得した証明書ファイルのパス
@@ -125,7 +125,7 @@ export class CertbotRunner {
     const serverUrl = getServerUrl(config.acmeProvider, config.acmeServerUrl);
 
     // Certbot certonly コマンドを構築
-    const command = this.buildCertbotCommand({
+    const { args } = this.buildCertbotCommand({
       domains: config.domains,
       email: config.email,
       serverUrl,
@@ -133,13 +133,14 @@ export class CertbotRunner {
       forceRenewal: !!config.acmCertificateArn, // ACM ARN が存在する場合は強制更新
       keyType: config.keyType,
       rsaKeySize: config.rsaKeySize,
+      certName: config.domains[0], // lineage 名を固定して番号付きディレクトリを防止
     });
 
-    console.log(`Executing: ${command}`);
+    console.log(`Executing: certbot ${args.join(' ')}`);
 
     try {
-      // Certbot certonly コマンドを同期実行
-      const output = execSync(command, {
+      // Certbot certonly コマンドを同期実行（execFileSync でシェル経由しない）
+      const output = execFileSync('certbot', args, {
         encoding: 'utf-8',
         stdio: 'pipe',
         env: {
@@ -151,8 +152,11 @@ export class CertbotRunner {
 
       console.log('Certbot output:', output);
 
+      // Certbot の stdout から証明書の保存先ディレクトリを解析
+      const certDir = this.parseCertificateDir(output);
+
       // 取得した証明書ファイルのパスを解決
-      const certPaths = this.getCertificatePaths(config.domains[0]);
+      const certPaths = this.getCertificatePaths(config.domains[0], certDir);
 
       console.log('Certificate obtained successfully');
       console.log('Paths:', certPaths);
@@ -172,6 +176,7 @@ export class CertbotRunner {
    *
    * イベントペイロードのパラメータから証明書を取得する。
    * Route53 DNS-01 チャレンジを使用して自動的にドメイン所有権を検証。
+   * --cert-name オプションで lineage 名を固定し、番号付きディレクトリの発生を防止。
    *
    * @param payload - ドメイン、メール、サーバー URL などを含むペイロード
    * @returns 取得した証明書ファイルのパス
@@ -182,7 +187,7 @@ export class CertbotRunner {
     console.log(`Server: ${payload.input.server}`);
 
     // Certbot certonly コマンドを構築
-    const command = this.buildCertbotCommand({
+    const { args } = this.buildCertbotCommand({
       domains: payload.input.domains,
       email: payload.input.email,
       serverUrl: payload.input.server,
@@ -190,13 +195,14 @@ export class CertbotRunner {
       forceRenewal: payload.input.forceRenewal || false,
       keyType: payload.input.keyType,
       rsaKeySize: payload.input.rsaKeySize,
+      certName: payload.input.domains[0], // lineage 名を固定して番号付きディレクトリを防止
     });
 
-    console.log(`Executing: ${command}`);
+    console.log(`Executing: certbot ${args.join(' ')}`);
 
     try {
-      // Certbot certonly コマンドを同期実行
-      const output = execSync(command, {
+      // Certbot certonly コマンドを同期実行（execFileSync でシェル経由しない）
+      const output = execFileSync('certbot', args, {
         encoding: 'utf-8',
         stdio: 'pipe',
         env: {
@@ -208,8 +214,11 @@ export class CertbotRunner {
 
       console.log('Certbot output:', output);
 
+      // Certbot の stdout から証明書の保存先ディレクトリを解析
+      const certDir = this.parseCertificateDir(output);
+
       // 取得した証明書ファイルのパスを解決
-      const certPaths = this.getCertificatePaths(payload.input.domains[0]);
+      const certPaths = this.getCertificatePaths(payload.input.domains[0], certDir);
 
       console.log('Certificate obtained successfully');
       console.log('Paths:', certPaths);
@@ -227,11 +236,12 @@ export class CertbotRunner {
   /**
    * Certbot certonly コマンドを構築
    *
-   * パラメータから Certbot certonly コマンドラインを生成する。
-   * キータイプ（RSA/ECDSA）、強制更新フラグなどのオプションを適切に処理。
+   * パラメータから Certbot certonly コマンドの引数配列を生成する。
+   * キータイプ（RSA/ECDSA）、強制更新フラグ、cert-name などのオプションを適切に処理。
+   * execFileSync 用に引数を配列として返す（コマンドインジェクション対策）。
    *
    * @param params - コマンド構築パラメータ
-   * @returns 実行可能な Certbot コマンド文字列
+   * @returns コマンド名と引数配列
    */
   private buildCertbotCommand(params: {
     domains: string[];
@@ -241,31 +251,30 @@ export class CertbotRunner {
     forceRenewal: boolean;
     keyType?: 'rsa' | 'ecdsa';
     rsaKeySize?: 2048 | 4096;
-  }): string {
-    // ドメイン引数を構築（複数ドメインの場合は `-d domain1 -d domain2` の形式）
-    const domainArgs = params.domains.map(d => `-d ${d}`).join(' ');
+    certName?: string;
+  }): { command: string; args: string[] } {
     const keyType = params.keyType || 'rsa'; // デフォルトは RSA
     const rsaKeySize = params.rsaKeySize || 2048; // デフォルトは 2048 ビット
 
-    // Certbot certonly コマンドの基本引数
-    const args = [
-      'certbot certonly',
+    // Certbot certonly コマンドの引数を配列で構築
+    const args: string[] = [
+      'certonly',
       '--non-interactive', // 対話モード無効（Lambda に必須）
       '--agree-tos', // 利用規約に自動同意
-      `--email ${params.email}`, // 通知用メールアドレス
+      '--email', params.email, // 通知用メールアドレス
       '--dns-route53', // Route53 DNS-01 プラグインを使用
-      `--server ${params.serverUrl}`, // ACME サーバー URL
-      `--config-dir ${this.configDir}`, // 設定保存先
-      `--work-dir ${this.workDir}`, // 作業ディレクトリ
-      `--logs-dir ${this.logsDir}`, // ログ出力先
-      domainArgs, // ドメインリスト
-      '--preferred-challenges dns-01', // DNS-01 チャレンジを優先
-      `--key-type ${keyType}`, // 証明書のキータイプ（rsa または ecdsa）
+      '--server', params.serverUrl, // ACME サーバー URL
+      '--config-dir', this.configDir, // 設定保存先
+      '--work-dir', this.workDir, // 作業ディレクトリ
+      '--logs-dir', this.logsDir, // ログ出力先
+      ...params.domains.flatMap(d => ['-d', d]), // ドメインリスト
+      '--preferred-challenges', 'dns-01', // DNS-01 チャレンジを優先
+      '--key-type', keyType, // 証明書のキータイプ（rsa または ecdsa）
     ];
 
     // RSA を使用する場合のみキーサイズを指定
     if (keyType === 'rsa') {
-      args.push(`--rsa-key-size ${rsaKeySize}`);
+      args.push('--rsa-key-size', String(rsaKeySize));
     }
 
     // 強制更新フラグが true の場合、既存の証明書を上書き
@@ -273,26 +282,119 @@ export class CertbotRunner {
       args.push('--force-renewal');
     }
 
-    return args.join(' ');
+    // cert-name を指定して lineage 名を固定（番号付きディレクトリの発生を防止）
+    if (params.certName) {
+      args.push('--cert-name', params.certName);
+    }
+
+    return { command: 'certbot', args };
+  }
+
+  /**
+   * Certbot の stdout から証明書の保存先ディレクトリを解析する
+   *
+   * Certbot の出力には以下の形式で保存先パスが含まれる:
+   *   Certificate is saved at: /tmp/certbot/config/live/example.com/fullchain.pem
+   *   Key is saved at:         /tmp/certbot/config/live/example.com/privkey.pem
+   *
+   * @param stdout - Certbot の標準出力
+   * @returns 証明書ディレクトリの絶対パス、または解析失敗時は null
+   */
+  private parseCertificateDir(stdout: string): string | null {
+    // "Certificate is saved at:" パターンで解析
+    const certMatch = stdout.match(/Certificate is saved at:\s+(.+)\/fullchain\.pem/);
+    if (certMatch) {
+      console.log(`Parsed certificate directory from Certbot output: ${certMatch[1]}`);
+      return certMatch[1];
+    }
+
+    // "Key is saved at:" パターンでフォールバック
+    const keyMatch = stdout.match(/Key is saved at:\s+(.+)\/privkey\.pem/);
+    if (keyMatch) {
+      console.log(`Parsed certificate directory from Certbot key output: ${keyMatch[1]}`);
+      return keyMatch[1];
+    }
+
+    console.log('Could not parse certificate directory from Certbot output');
+    return null;
+  }
+
+  /**
+   * 最新の証明書ディレクトリを検索する（番号付きディレクトリ対応）
+   *
+   * live/ ディレクトリ内の {domain} および {domain}-NNNN パターンにマッチする
+   * ディレクトリを検索し、最大番号のディレクトリを返す。
+   * --cert-name 指定時のフォールバックとして使用。
+   *
+   * @param primaryDomain - プライマリドメイン
+   * @returns 最新の証明書ディレクトリの絶対パス
+   * @throws ディレクトリが見つからない場合にエラーをスロー
+   */
+  private findLatestCertDir(primaryDomain: string): string {
+    const liveBaseDir = path.join(this.configDir, 'live');
+
+    if (!fs.existsSync(liveBaseDir)) {
+      throw new Error(`Live directory not found: ${liveBaseDir}`);
+    }
+
+    const entries = fs.readdirSync(liveBaseDir, { withFileTypes: true });
+
+    // ドメイン名の正規表現特殊文字をエスケープ
+    const escapedDomain = primaryDomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // {domain} と {domain}-NNNN のパターンにマッチ
+    const pattern = new RegExp(`^${escapedDomain}(-\\d+)?$`);
+
+    const matchingDirs = entries
+      .filter(e => e.isDirectory() && pattern.test(e.name))
+      .map(e => e.name)
+      .sort((a, b) => {
+        // 番号なし（元のディレクトリ）は -1 として扱い、番号付きが優先される
+        const numA = parseInt(a.match(/-(\d+)$/)?.[1] ?? '-1');
+        const numB = parseInt(b.match(/-(\d+)$/)?.[1] ?? '-1');
+        return numB - numA; // 降順（最大番号が先頭）
+      });
+
+    if (matchingDirs.length === 0) {
+      throw new Error(`No certificate directory found for ${primaryDomain} in ${liveBaseDir}`);
+    }
+
+    const result = path.join(liveBaseDir, matchingDirs[0]);
+    console.log(`Found latest certificate directory: ${result}`);
+    return result;
   }
 
   /**
    * 証明書ファイルのパスを取得
    *
    * Certbot が生成した証明書ファイルのパスを解決する。
-   * Certbot は証明書を `config/live/<primary-domain>/` ディレクトリに保存。
+   * 以下の優先順位でディレクトリを決定:
+   * 1. Certbot stdout から解析したパス（certbotOutputDir）
+   * 2. デフォルトパス: config/live/{primaryDomain}/
+   * 3. フォールバック: config/live/ 内の番号付きディレクトリを検索
    *
    * @param primaryDomain - プライマリドメイン（複数ドメインの場合は最初のドメイン）
+   * @param certbotOutputDir - Certbot stdout から解析した保存先ディレクトリ（省略可）
    * @returns 証明書ファイルのパス（cert.pem, chain.pem, fullchain.pem, privkey.pem）
    * @throws 証明書ディレクトリまたはファイルが存在しない場合にエラーをスロー
    */
-  private getCertificatePaths(primaryDomain: string): CertbotCertificatePaths {
-    // Certbot が証明書を保存するディレクトリ
-    const liveDir = path.join(this.configDir, 'live', primaryDomain);
+  private getCertificatePaths(primaryDomain: string, certbotOutputDir?: string | null): CertbotCertificatePaths {
+    let liveDir: string;
 
-    // ディレクトリの存在確認
-    if (!fs.existsSync(liveDir)) {
-      throw new Error(`Certificate directory not found: ${liveDir}`);
+    if (certbotOutputDir && fs.existsSync(certbotOutputDir)) {
+      // 1. Certbot stdout から解析したパスを優先
+      liveDir = certbotOutputDir;
+      console.log(`Using certificate directory from Certbot output: ${liveDir}`);
+    } else {
+      // 2. --cert-name 指定時は番号なしディレクトリが存在するはず
+      const defaultDir = path.join(this.configDir, 'live', primaryDomain);
+      if (fs.existsSync(defaultDir)) {
+        liveDir = defaultDir;
+      } else {
+        // 3. フォールバック: 番号付きディレクトリを検索
+        console.log(`Default directory not found: ${defaultDir}, searching for numbered directories...`);
+        liveDir = this.findLatestCertDir(primaryDomain);
+      }
+      console.log(`Using certificate directory: ${liveDir}`);
     }
 
     // 証明書ファイルのパスを構築

@@ -71,11 +71,14 @@ The system operates in three distinct modes based on Lambda event payload:
   - `handleRegisterMode()`: EAB account registration
   - `handleCertonlyMode()`: Payload-based certificate acquisition, creates/updates domains.json
   - `handleRenewMode()`: Config-based renewal workflow
-- `certbot/runner.ts`: Certbot command wrapper
+- `certbot/runner.ts`: Certbot command wrapper (uses `execFileSync` for security)
   - `registerAccount()`: Executes `certbot register` with EAB
   - `obtainCertificateFromPayload()`: Executes `certbot certonly` from payload
   - `obtainCertificate()`: Executes `certbot certonly` from config
-  - `buildCertbotCommand()`: Constructs Certbot CLI with key type options
+  - `buildCertbotCommand()`: Constructs Certbot CLI args array with `--cert-name` for lineage stability
+  - `parseCertificateDir()`: Parses certificate directory path from Certbot stdout
+  - `findLatestCertDir()`: Fallback search for numbered certificate directories (`{domain}-NNNN`)
+  - `getCertificatePaths()`: 3-tier path resolution (stdout parsed → default → numbered directory search)
 - `acm/certificate-manager.ts`: ACM import/re-import operations
 - `storage/s3-manager.ts`: S3 operations (config download, Certbot state sync, certificate backup)
 - `notification/notifier.ts`: SNS notifications
@@ -138,7 +141,20 @@ Certificates can use different key algorithms (configurable in domains.json or c
 - `keyType: "rsa"` with `rsaKeySize: 2048` (default) or `4096`
 - `keyType: "ecdsa"` (no size parameter, uses Certbot defaults)
 
-Certbot command includes `--key-type` and conditionally `--rsa-key-size` flags.
+Certbot command includes `--key-type`, conditionally `--rsa-key-size`, and `--cert-name` flags.
+
+### Certificate Directory Resolution
+
+Certbot may create numbered directories (`live/{domain}-0001/`, `-0002/`, etc.) when a lineage name conflicts with an existing directory. This is especially problematic when S3 sync strips symlinks (S3 doesn't support symlinks), causing old certificate files to persist in the original directory.
+
+**Solution**: `--cert-name` option fixes the lineage name and prevents numbered directories. Certificate path resolution uses a 3-tier fallback:
+1. Parse actual path from Certbot stdout (`Certificate is saved at:`)
+2. Use default path `config/live/{primaryDomain}/`
+3. Search for highest-numbered directory matching `{domain}-NNNN` pattern
+
+### Security: Command Execution
+
+All Certbot commands use `execFileSync` (not `execSync`) to prevent command injection. Arguments are passed as arrays, never as shell-concatenated strings.
 
 ## Critical Files
 

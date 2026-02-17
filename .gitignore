@@ -43,3 +43,8 @@ yarn-error.log*
 # Temporary files
 *.tmp
 .cache
+
+# Misc
+docs
+plans
+reviews
