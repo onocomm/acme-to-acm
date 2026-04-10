@@ -129,6 +129,7 @@ This project uses `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 
 - Base: `public.ecr.aws/lambda/provided:al2023`
 - Node.js Runtime: Installed via dnf (Node.js 22)
 - Python Runtime: Installed via dnf (Python 3.13)
+- Build Tools: cmake, gcc, gcc-c++, make, tar, xz, autoconf, automake, libtool
 - Lambda RIC: `aws-lambda-ric` npm package for custom Node.js runtime
 - Handler: TypeScript (compiled to `dist/index.handler`)
 - ENTRYPOINT: `/usr/bin/npx aws-lambda-ric`
@@ -403,6 +404,10 @@ aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
   docker buildx prune -a -f
   # Restart Docker Desktop
   ```
+
+**Symptom**: `tar: xz: Cannot exec: No such file or directory` during `npm install aws-lambda-ric`
+- **Cause**: `xz` package missing from Dockerfile's `dnf install`
+- **Solution**: Ensure `xz` is included in the `dnf install` dependencies list
 
 **Symptom**: `openssl-snapsafe-libs` conflicts during pip install
 - **Cause**: Using wrong base image (e.g., `nodejs:22` instead of `provided:al2023`)

@@ -530,6 +530,12 @@ new AcmeToAcmStack(app, 'AcmeToAcmStack', {
 
 ### Docker ビルドエラー
 
+**エラー**: `tar: xz: Cannot exec: No such file or directory`（`npm install aws-lambda-ric` 時）
+
+**原因**: Dockerfile の `dnf install` に `xz` パッケージが含まれていない
+
+**解決方法**: `lambda/Dockerfile` の `dnf install` に `xz` を追加してください。
+
 **エラー**: `Failed to find and execute 'docker'`
 
 **原因**: Docker Desktop がインストールされていないか、起動していない
