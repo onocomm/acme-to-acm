@@ -49,6 +49,7 @@ RUN dnf install -y \
     gcc-c++ \
     make \
     tar \
+    xz \
     autoconf \
     automake \
     libtool \
