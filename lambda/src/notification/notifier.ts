@@ -5,6 +5,7 @@
  * 成功/失敗/スキップの詳細を含むサマリーレポートを生成。
  */
 
+import { errorCode } from '../diagnostics';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { RenewalResult } from '../types/domain-config';
 
@@ -35,7 +36,7 @@ export class Notifier {
    */
   async sendRenewalSummary(results: RenewalResult[]): Promise<void> {
     // 各カテゴリの件数を集計
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter(r => r.success && !r.skipped).length;
     const failureCount = results.filter(r => r.success === false && !r.skipped).length;
     const skippedCount = results.filter(r => r.skipped).length;
 
@@ -84,8 +85,7 @@ export class Notifier {
       `Context: ${context || 'Unknown'}`,
       '',
       'Error Details:',
-      `  Message: ${error.message}`,
-      `  Stack: ${error.stack || 'No stack trace available'}`,
+      `  Code: ${errorCode(error)}`,
       '',
       'Please check CloudWatch Logs for more details.',
     ].join('\n');
@@ -150,7 +150,7 @@ export class Notifier {
     ];
 
     // 成功した証明書の詳細
-    const successes = results.filter(r => r.success);
+    const successes = results.filter(r => r.success && !r.skipped);
     if (successes.length > 0) {
       lines.push('Successfully Renewed Certificates:');
       lines.push('-'.repeat(60));
@@ -175,7 +175,7 @@ export class Notifier {
       for (const result of failures) {
         lines.push(`  • ${result.certificateId}`);
         lines.push(`    Domains: ${result.domains.join(', ')}`);
-        lines.push(`    Error: ${result.error || 'Unknown error'}`);
+        lines.push(`    Error: ${errorCode({ name: result.error })}`);
         lines.push('');
       }
     }
@@ -227,7 +227,7 @@ export class Notifier {
       console.log('Notification sent successfully');
     } catch (error) {
       // 通知送信失敗はエラーログのみ（処理全体は中断させない）
-      console.error('Failed to send notification:', error);
+      console.error('Failed to send notification', errorCode(error));
       // Don't throw - notification failure shouldn't break the entire process
     }
   }

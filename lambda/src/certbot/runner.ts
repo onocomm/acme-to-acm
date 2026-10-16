@@ -6,6 +6,7 @@
  * ファイルパス解決などの機能を提供する。
  */
 
+import { errorCode, failure } from '../diagnostics';
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -52,7 +53,6 @@ export class CertbotRunner {
     for (const dir of [this.configDir, this.workDir, this.logsDir]) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
-        console.log(`Created directory: ${dir}`);
       }
     }
   }
@@ -68,8 +68,7 @@ export class CertbotRunner {
    * @throws Certbot コマンドが失敗した場合にエラーをスロー
    */
   async registerAccount(payload: RegisterPayload): Promise<void> {
-    console.log(`Registering ACME account for ${payload.input.email}`);
-    console.log(`Server: ${payload.input.server}`);
+    console.log('Certbot operation started');
 
     // Certbot register コマンドの引数を配列で構築（コマンドインジェクション対策）
     const args = [
@@ -90,19 +89,17 @@ export class CertbotRunner {
 
     try {
       // Certbot register コマンドを同期実行（execFileSync でシェル経由しない）
-      const output = execFileSync('certbot', args, {
+      execFileSync('certbot', args, {
         encoding: 'utf-8',
         stdio: 'pipe', // 出力をキャプチャ
       });
 
       console.log('Account registered successfully');
-      console.log('Output:', output);
+      // register の stdout は破棄する。
     } catch (error: any) {
       // 登録失敗時のエラー処理
-      console.error('Account registration failed:', error.message);
-      if (error.stdout) console.error('stdout:', error.stdout);
-      if (error.stderr) console.error('stderr:', error.stderr);
-      throw new Error(`Certbot register failed: ${error.message}`);
+      console.error('Account registration failed', errorCode(error));
+      throw failure('CertbotRegistrationFailed');
     }
   }
 
@@ -119,7 +116,7 @@ export class CertbotRunner {
    * @throws Certbot コマンドが失敗した場合にエラーをスロー
    */
   async obtainCertificate(config: CertificateConfig): Promise<CertbotCertificatePaths> {
-    console.log(`Obtaining certificate for ${config.domains.join(', ')}`);
+    console.log('Certbot operation started');
 
     // プロバイダー設定から ACME サーバー URL を取得
     const serverUrl = getServerUrl(config.acmeProvider, config.acmeServerUrl);
@@ -136,8 +133,6 @@ export class CertbotRunner {
       certName: config.domains[0], // lineage 名を固定して番号付きディレクトリを防止
     });
 
-    console.log(`Executing: certbot ${args.join(' ')}`);
-
     try {
       // Certbot certonly コマンドを同期実行（execFileSync でシェル経由しない）
       const output = execFileSync('certbot', args, {
@@ -150,7 +145,7 @@ export class CertbotRunner {
         },
       });
 
-      console.log('Certbot output:', output);
+      // stdout はパス解析のみに使い、ログには出さない。
 
       // Certbot の stdout から証明書の保存先ディレクトリを解析
       const certDir = this.parseCertificateDir(output);
@@ -159,15 +154,13 @@ export class CertbotRunner {
       const certPaths = this.getCertificatePaths(config.domains[0], certDir);
 
       console.log('Certificate obtained successfully');
-      console.log('Paths:', certPaths);
+      // 証明書パスはログに出さない。
 
       return certPaths;
     } catch (error: any) {
       // 証明書取得失敗時のエラー処理
-      console.error('Certbot execution failed:', error.message);
-      if (error.stdout) console.error('stdout:', error.stdout);
-      if (error.stderr) console.error('stderr:', error.stderr);
-      throw new Error(`Certbot failed: ${error.message}`);
+      console.error('Certbot execution failed', errorCode(error));
+      throw failure('CertbotExecutionFailed');
     }
   }
 
@@ -183,8 +176,7 @@ export class CertbotRunner {
    * @throws Certbot コマンドが失敗した場合にエラーをスロー
    */
   async obtainCertificateFromPayload(payload: CertonlyPayload): Promise<CertbotCertificatePaths> {
-    console.log(`Obtaining certificate for ${payload.input.domains.join(', ')}`);
-    console.log(`Server: ${payload.input.server}`);
+    console.log('Certbot operation started');
 
     // Certbot certonly コマンドを構築
     const { args } = this.buildCertbotCommand({
@@ -198,8 +190,6 @@ export class CertbotRunner {
       certName: payload.input.domains[0], // lineage 名を固定して番号付きディレクトリを防止
     });
 
-    console.log(`Executing: certbot ${args.join(' ')}`);
-
     try {
       // Certbot certonly コマンドを同期実行（execFileSync でシェル経由しない）
       const output = execFileSync('certbot', args, {
@@ -212,7 +202,7 @@ export class CertbotRunner {
         },
       });
 
-      console.log('Certbot output:', output);
+      // stdout はパス解析のみに使い、ログには出さない。
 
       // Certbot の stdout から証明書の保存先ディレクトリを解析
       const certDir = this.parseCertificateDir(output);
@@ -221,15 +211,13 @@ export class CertbotRunner {
       const certPaths = this.getCertificatePaths(payload.input.domains[0], certDir);
 
       console.log('Certificate obtained successfully');
-      console.log('Paths:', certPaths);
+      // 証明書パスはログに出さない。
 
       return certPaths;
     } catch (error: any) {
       // 証明書取得失敗時のエラー処理
-      console.error('Certbot execution failed:', error.message);
-      if (error.stdout) console.error('stdout:', error.stdout);
-      if (error.stderr) console.error('stderr:', error.stderr);
-      throw new Error(`Certbot failed: ${error.message}`);
+      console.error('Certbot execution failed', errorCode(error));
+      throw failure('CertbotExecutionFailed');
     }
   }
 
@@ -304,14 +292,14 @@ export class CertbotRunner {
     // "Certificate is saved at:" パターンで解析
     const certMatch = stdout.match(/Certificate is saved at:\s+(.+)\/fullchain\.pem/);
     if (certMatch) {
-      console.log(`Parsed certificate directory from Certbot output: ${certMatch[1]}`);
+
       return certMatch[1];
     }
 
     // "Key is saved at:" パターンでフォールバック
     const keyMatch = stdout.match(/Key is saved at:\s+(.+)\/privkey\.pem/);
     if (keyMatch) {
-      console.log(`Parsed certificate directory from Certbot key output: ${keyMatch[1]}`);
+
       return keyMatch[1];
     }
 
@@ -359,7 +347,7 @@ export class CertbotRunner {
     }
 
     const result = path.join(liveBaseDir, matchingDirs[0]);
-    console.log(`Found latest certificate directory: ${result}`);
+
     return result;
   }
 
@@ -380,10 +368,16 @@ export class CertbotRunner {
   private getCertificatePaths(primaryDomain: string, certbotOutputDir?: string | null): CertbotCertificatePaths {
     let liveDir: string;
 
+    const expectedParent = path.resolve(this.configDir, 'live');
+    const escapedName = primaryDomain.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
+    const lineagePattern = new RegExp(`^${escapedName}(-\\d+)?$`);
+    if (certbotOutputDir && (path.dirname(path.resolve(certbotOutputDir)) !== expectedParent ||
+      !lineagePattern.test(path.basename(certbotOutputDir)))) {
+      throw failure('CertbotExecutionFailed');
+    }
     if (certbotOutputDir && fs.existsSync(certbotOutputDir)) {
       // 1. Certbot stdout から解析したパスを優先
       liveDir = certbotOutputDir;
-      console.log(`Using certificate directory from Certbot output: ${liveDir}`);
     } else {
       // 2. --cert-name 指定時は番号なしディレクトリが存在するはず
       const defaultDir = path.join(this.configDir, 'live', primaryDomain);
@@ -391,10 +385,9 @@ export class CertbotRunner {
         liveDir = defaultDir;
       } else {
         // 3. フォールバック: 番号付きディレクトリを検索
-        console.log(`Default directory not found: ${defaultDir}, searching for numbered directories...`);
+
         liveDir = this.findLatestCertDir(primaryDomain);
       }
-      console.log(`Using certificate directory: ${liveDir}`);
     }
 
     // 証明書ファイルのパスを構築
@@ -422,17 +415,17 @@ export class CertbotRunner {
    * 処理完了後にクリーンアップして空き容量を確保する。
    * クリーンアップ失敗は処理全体を中断させない（graceful）。
    */
-  cleanup(): void {
+  cleanup(strict = false): void {
     console.log('Cleaning up Certbot directories...');
 
     try {
       if (fs.existsSync(this.certbotDir)) {
         // 再帰的に削除（force オプションでエラー無視）
         fs.rmSync(this.certbotDir, { recursive: true, force: true });
-        console.log(`Removed directory: ${this.certbotDir}`);
       }
     } catch (error: any) {
-      console.error('Failed to cleanup Certbot directories:', error.message);
+      console.error('Failed to cleanup Certbot directories', errorCode(error));
+      if (strict) throw failure('OperationFailed');
       // クリーンアップ失敗は処理全体を中断させない
     }
   }

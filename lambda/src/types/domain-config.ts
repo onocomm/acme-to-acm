@@ -62,7 +62,7 @@ export interface CertificateConfig {
 
   /**
    * DNS 検証用の Route53 ホストゾーン ID
-   * Certbot の Route53 プラグインが DNS-01 チャレンジで使用
+   * 照合用メタデータ。Certbotは公開Zoneから自動探索するため、この値で選択を強制しない。
    */
   route53HostedZoneId: string;
 
@@ -234,7 +234,7 @@ export interface RenewPayload {
     mode: 'renew';
     /** 更新対象の証明書 ID リスト（未指定の場合は有効なすべての証明書） */
     certificateIds?: string[];
-    /** ドライランモード（実際の変更は行わない） */
+    /** 発行とACMインポートを省略。S3同期・ロック・SNS通知は実行する。 */
     dryRun?: boolean;
   };
 }

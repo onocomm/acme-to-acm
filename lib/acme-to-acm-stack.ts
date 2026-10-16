@@ -15,7 +15,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CertificateStorage } from './constructs/storage';
 import { CertificateNotification } from './constructs/notification';
-import { CertificateLambda } from './constructs/certificate-lambda';
+import { CertificateLambda, Route53ChallengeZone } from './constructs/certificate-lambda';
 
 /**
  * AcmeToAcmStack のプロパティ
@@ -23,6 +23,9 @@ import { CertificateLambda } from './constructs/certificate-lambda';
  * スタック作成時に指定可能な設定パラメータ
  */
 export interface AcmeToAcmStackProps extends cdk.StackProps {
+  /** DNS-01 の変更先を Zone と _acme-challenge TXT 完全名へ制限する。未指定時は従来の全 Zone 権限。 */
+  route53ChallengeZones?: Route53ChallengeZone[];
+
   /**
    * SNS 通知用のメールアドレス（オプション）
    * 指定した場合、デプロイ後に手動でサブスクリプションを承認する必要がある
@@ -39,7 +42,7 @@ export interface AcmeToAcmStackProps extends cdk.StackProps {
   /**
    * 自動更新のスケジュール式（EventBridge cron）
    * UTC タイムゾーンで指定する
-   * @default 'cron(0 17 ? * SUN *)' - 毎週日曜日 17:00 UTC（日本時間 2:00）
+   * @default 'cron(0 17 ? * SUN *)' - 毎週日曜日 17:00 UTC（日本時間 月曜日 2:00）
    */
   scheduleExpression?: string;
 
@@ -91,6 +94,7 @@ export class AcmeToAcmStack extends cdk.Stack {
       scheduleExpression: props?.scheduleExpression, // 自動更新スケジュール
       enableSchedule: props?.enableSchedule, // スケジュール有効化フラグ
       stackNameSuffix: props?.stackNameSuffix, // リソース名サフィックス
+      route53ChallengeZones: props?.route53ChallengeZones,
     });
 
     // CloudFormation Outputs を追加
