@@ -81,6 +81,16 @@ test('既存ARNの明示的な別ARNへの置換を停止する', async () => {
   expect(acm.importCertificate).not.toHaveBeenCalled();
 });
 
+test.each([undefined, 'arn:existing'])('SAN順序を変えて再実行しても設定とARNが増えない: %s', async acmCertificateArn => {
+  document.certificates[0].domains = ['example.com', 'www.example.com'];
+  const event = { input: { ...payload.input, domains: ['www.example.com', 'example.com'], acmCertificateArn } };
+  for (let i = 0; i < 2; i++) expect((await handler(event)).statusCode).toBe(200);
+  expect(document.certificates).toHaveLength(2);
+  expect(document.certificates[0]).toMatchObject({ id: 'existing', acmCertificateArn: 'arn:existing' });
+  expect(document.certificates[1]).toEqual(cert('other', 'other.example.com', 'arn:other'));
+  expect(acm.importCertificate).toHaveBeenCalledWith(expect.anything(), 'existing', 'arn:existing');
+});
+
 test('ETag競合を成功扱いせず、無条件リトライしない', async () => {
   s3.uploadConfig.mockRejectedValue(namedError('PreconditionFailed'));
   const result = await handler(payload);

@@ -10,6 +10,7 @@ export function parseConfiguration(content: string): DomainConfiguration {
   }
   const ids = new Set<string>();
   const primaryDomains = new Set<string>();
+  const arns = new Set<string>();
   for (const cert of config.certificates) {
     if (!cert || typeof cert.id !== 'string' || !cert.id || ids.has(cert.id) ||
       !validDomains(cert.domains) || typeof cert.email !== 'string' || !cert.email ||
@@ -18,11 +19,13 @@ export function parseConfiguration(content: string): DomainConfiguration {
       typeof cert.route53HostedZoneId !== 'string' || !cert.route53HostedZoneId ||
       !(cert.acmCertificateArn === null || typeof cert.acmCertificateArn === 'string') ||
       typeof cert.enabled !== 'boolean' || !Number.isFinite(cert.renewDaysBeforeExpiry) ||
-      cert.renewDaysBeforeExpiry < 0 || primaryDomains.has(cert.domains[0].toLowerCase())) {
+      cert.renewDaysBeforeExpiry < 0 || primaryDomains.has(cert.domains[0].toLowerCase()) ||
+      (cert.acmCertificateArn !== null && (!cert.acmCertificateArn || arns.has(cert.acmCertificateArn)))) {
       throw failure('InvalidConfiguration');
     }
     ids.add(cert.id);
     primaryDomains.add(cert.domains[0].toLowerCase());
+    if (cert.acmCertificateArn) arns.add(cert.acmCertificateArn);
   }
   return config;
 }
@@ -46,8 +49,19 @@ export function findCertificate(config: DomainConfiguration, input: CertonlyPayl
   id: string; existing?: CertificateConfig;
 } {
   const primary = input.domains[0].toLowerCase();
-  const existing = config.certificates.find(c => c.domains[0].toLowerCase() === primary);
-  if (existing) return { id: existing.id, existing };
+  const domainSet = (domains: string[]) => [...new Set(domains.map(d => d.toLowerCase()))].sort().join(',');
+  const requestedDomains = domainSet(input.domains);
+  const candidates = config.certificates.filter(c =>
+    c.domains[0].toLowerCase() === primary || domainSet(c.domains) === requestedDomains ||
+    (!!input.acmCertificateArn && c.acmCertificateArn === input.acmCertificateArn));
+  // ドメインと明示ARNが別々の設定を指す場合は、片方を勝手に上書きしない。
+  if (candidates.length > 1) throw failure('InvalidInput');
+  const existing = candidates[0];
+  if (existing) {
+    if (existing.acmCertificateArn && input.acmCertificateArn &&
+      existing.acmCertificateArn !== input.acmCertificateArn) throw failure('InvalidInput');
+    return { id: existing.id, existing };
+  }
   const legacyId = `manual-${primary.replace(/[^a-zA-Z0-9]/g, '-')}`;
   const id = config.certificates.some(c => c.id === legacyId)
     ? `${legacyId}-${createHash('sha256').update(primary).digest('hex').slice(0, 12)}` : legacyId;

@@ -25,7 +25,31 @@ test('大文字小文字が違っても既存IDとARNを再利用する', () => 
 test.each([
   [certificate('same', 'a.example.com'), certificate('same', 'b.example.com')],
   [certificate('one', 'a.example.com'), certificate('two', 'A.example.com')],
+  [certificate('one', 'a.example.com'), certificate('two', 'b.example.com')],
 ])('重複する既存設定を勝手に統合せず停止する', certificates => {
   expect(() => parseConfiguration(JSON.stringify({ version: '1.0', certificates })))
     .toThrow('InvalidConfiguration');
+});
+
+test.each([undefined, 'arn:existing'])('SANの順序が変わっても既存IDとARNを再利用する: %s', acmCertificateArn => {
+  const existing = { ...certificate('stable-id', 'example.com'), domains: ['example.com', 'www.example.com'] };
+  const result = findCertificate({ version: '1.0', certificates: [existing] }, {
+    ...input('www.example.com'), domains: ['WWW.example.com', 'example.com'], acmCertificateArn,
+  });
+  expect(result).toEqual({ id: 'stable-id', existing });
+});
+
+test('明示ARNで対象を特定したドメイン変更も既存IDを保持する', () => {
+  const existing = certificate('stable-id', 'example.com');
+  expect(findCertificate({ version: '1.0', certificates: [existing] }, {
+    ...input('new.example.com'), acmCertificateArn: 'arn:existing',
+  })).toEqual({ id: 'stable-id', existing });
+});
+
+test('ドメインと明示ARNが別の設定を指す場合は停止する', () => {
+  const certificates = [certificate('one', 'a.example.com'),
+    { ...certificate('two', 'b.example.com'), acmCertificateArn: 'arn:other' }];
+  expect(() => findCertificate({ version: '1.0', certificates }, {
+    ...input('a.example.com'), acmCertificateArn: 'arn:other',
+  })).toThrow('InvalidInput');
 });

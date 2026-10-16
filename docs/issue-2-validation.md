@@ -7,7 +7,7 @@
 
 - イベント全体、EAB引数、Certbot stdout/stderr、外部例外のmessage/stackをログ・SNS・応答へ出さない。許可した固定エラーコードだけを返す。Certbotのログディレクトリは状態のS3同期対象外。
 - certonlyは発行前に設定を取得・検証する。NoSuchKeyだけ初回作成とし、権限、通信、JSON、構造不正では発行も設定書込も停止する。
-- 主ドメインの一致で既存IDを再利用し、既存ARN、更新閾値、有効/無効、他証明書と設定の追加フィールドを保持する。旧manual-IDが別ドメインと衝突するときは安定ハッシュを付ける。既存の重複ID/主ドメインは自動統合せず停止する。
+- 主ドメイン・順序を問わないSAN集合・明示ARNを照合して既存IDを再利用し、既存ARN、更新閾値、有効/無効、他証明書と設定の追加フィールドを保持する。旧manual-IDが別ドメインと衝突するときは安定ハッシュを付ける。既存の重複ID/主ドメイン/ARNは自動統合せず停止する。ドメインと明示ARNが異なる設定を指す入力も発行前に停止する。
 - domains.jsonの既存更新はIfMatch、新規作成はIfNoneMatchを使う。renewで初回発行したARNも保存する。連続書込には自分のPutObject応答ETagを使い、後から読んだ別更新のETagを使わない。
 - Lambda予約同時実行数を1にし、さらにバケット共通の`locks/certbot.json`をIfNoneMatchで取得する。別関数から同じバケットへ接続しても排他する。解放時は所有者とETagを確認しIfMatchで削除する。ロック前の競合失敗ではCertbotのローカル状態へ触れない。
 - Certbot状態を`certbot/.snapshots/<uuid>/`へ保存し、全件成功後に`certbot/.snapshot.json`を切り替える。復元も全件を作業ディレクトリへ取得した後で入れ替える。ListObjectsV2の空ページも含め全ページを辿る。
@@ -44,7 +44,7 @@ OSイメージタグとPythonパッケージは従来同様に可変であり、
 | 検証 | 結果 |
 | --- | --- |
 | root/Lambdaビルド | Node.js v24.4.0で成功 |
-| Jest | 7 suites / 89 tests成功 |
+| Jest | 7 suites / 96 tests成功 |
 | Git基準コミットのsynth | 成功 |
 | 修正版の既定設定synth | 成功 |
 | Zone/TXT制限を指定したsynth | 成功 |
