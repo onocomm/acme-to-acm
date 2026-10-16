@@ -22,7 +22,7 @@ ACME プロトコルを使用したサーバー証明書の自動更新システ
 ```
 ┌─────────────────────┐
 │  EventBridge Rule   │ (Weekly Schedule)
-│  (日曜 午前2時JST)   │
+│  (月曜 午前2時JST)   │
 └──────────┬──────────┘
            │
            ▼
@@ -30,7 +30,7 @@ ACME プロトコルを使用したサーバー証明書の自動更新システ
 │  Lambda Function    │
 │  (Container Image)  │
 │  - AL2023 OS-only   │
-│  - Node.js 22       │
+│  - Node.js 24       │
 │  - Python 3.13      │
 │  - Certbot          │
 └──────────┬──────────┘
@@ -47,7 +47,7 @@ ACME プロトコルを使用したサーバー証明書の自動更新システ
 
 このプロジェクトは `public.ecr.aws/lambda/provided:al2023` (Amazon Linux 2023 OS-only ベースイメージ) を使用しています。これにより、Node.js と Python の両方を対等な依存関係として扱い、以下の利点があります：
 
-- **ランタイムの対等な扱い**: Node.js 22 と Python 3.13 の両方を明示的にインストール
+- **ランタイムの対等な扱い**: Node.js 24 と Python 3.13 の両方を明示的にインストール
 - **OpenSSL 互換性**: ランタイム固有のイメージで発生する OpenSSL 互換性の問題を回避
 - **依存関係の明確化**: すべての依存関係が Dockerfile に明記される
 - **カスタムランタイム制御**: AWS Lambda Runtime Interface Client (RIC) による完全な制御
@@ -87,7 +87,7 @@ acme-to-acm/
 
 ## 前提条件
 
-- Node.js 22 以上
+- Node.js 24.x
 - AWS CLI 設定済み
 - **Docker Desktop** (Lambda コンテナイメージビルド用)
   - [macOS](https://docs.docker.com/desktop/install/mac-install/)
@@ -103,7 +103,7 @@ acme-to-acm/
 
 ```bash
 # ルートでインストール（lambda/ ディレクトリも自動的にインストールされます）
-npm install
+npm ci
 ```
 
 ### 2. CDK ブートストラップ（初回のみ）
@@ -411,7 +411,7 @@ domains.json の設定に基づいて証明書を更新します（週次スケ�
 |------------|------|-----|-----------|------|-----|
 | `mode` | ✅ 必須 | string | - | 実行モード（固定値） | `"renew"` |
 | `certificateIds` | ⭕ オプション | string[] | `[]`（全証明書） | 更新対象の証明書 ID リスト（未指定時は有効なすべての証明書が対象） | `["example-com", "another-domain"]` |
-| `dryRun` | ⭕ オプション | boolean | `false` | ドライランモード（実際の変更は行わない） | `true` または `false` |
+| `dryRun` | ⭕ オプション | boolean | `false` | 発行・ACMインポートを省略（S3同期・ロック・SNS通知は実行） | `true` または `false` |
 
 ```bash
 # 全ての有効な証明書を処理（自動実行と同じ）
@@ -484,7 +484,7 @@ domains.json または certonly ペイロードで `keyType` と `rsaKeySize` �
 
 ### スケジュール変更
 
-デフォルトでは毎週日曜日 午前 2 時（JST）に実行されます。変更するには `bin/acme-to-acm.ts` を編集：
+デフォルトでは毎週月曜日 午前 2 時（JST）に実行されます。変更するには `bin/acme-to-acm.ts` を編集：
 
 ```typescript
 new AcmeToAcmStack(app, 'AcmeToAcmStack', {
@@ -607,3 +607,32 @@ Copyright (c) 2025 株式会社オノコム (Onocom Co., Ltd.)
 - [JPRS ACME 対応](https://jprs.jp/related-info/guide/058.html)
 - [Let's Encrypt](https://letsencrypt.org/)
 - [AWS CDK](https://docs.aws.amazon.com/cdk/)
+
+
+## JPRS導入前の安全対策と検証
+
+Issue #2 の変更内容、検証結果、既存配備への影響と切り戻し手順は
+[導入・検証記録](docs/issue-2-validation.md) を参照してください。
+
+- `npm ci` は root/Lambda の lockfile を使います。ローカルでは RIC の native build を省略し、Docker 内の `npm ci --omit=dev` で実行します。
+- `npm run build`、`npm test -- --runInBand`、`npm run synth -- --no-lookups` でコードとCDKを検証します。
+- `npm run test:runtime` は linux/amd64 イメージを実ビルドし、認証情報や外部ネットワークなしで Node.js 24 / Python / Certbot / Route53 plugin / RIC の起動を確認します。
+- 更新の一部失敗でも `statusCode: 500` を返します。Lambda Invoke の HTTP 200 は実処理の成功を表しません。`FunctionError`、Payload の `statusCode`・`totalFailed`・各 `results` を確認してください。
+- `dryRun` は発行試験や読み取り専用操作ではありません。S3状態の同期とロック、SNS通知を実行し、対象はスキップとして数えます。
+- 既定の `cron(0 17 ? * SUN *)` は日曜17:00 UTC、**月曜02:00 JST**です。値は変更していません。
+
+### Route 53権限の限定
+
+新規導入時は、環境別の CDK context に全証明書の challenge TXT 名を列挙してください。
+共通コードには顧客のZone IDや認証情報を入れません。
+
+```bash
+npm run synth -- --no-lookups \
+  -c 'route53ChallengeZones=[{"hostedZoneId":"Z1234567890ABC","recordNames":["_acme-challenge.example.com","_acme-challenge.www.example.com"]}]'
+```
+
+設定すると、Zoneごとに指定したTXT完全名のUPSERT/DELETEだけを許可します。
+未指定時は既存配備との互換性を保つため全Hosted Zoneの従来権限を維持します。
+`example.com` と `*.example.com` の challenge 名は両方とも `_acme-challenge.example.com` です。
+`route53HostedZoneId` は照合用メタデータで、CertbotのZone選択を強制しません。
+導入前に、公開Zoneの最長suffixによる自動選択と親ZoneのNS委任が意図したZoneに一致することを確認してください。

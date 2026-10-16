@@ -21,7 +21,22 @@ import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 /**
  * CertificateLambda Construct のプロパティ
  */
+export interface Route53ChallengeZone {
+  /** 公開 Hosted Zone の ID（例: Z1234567890ABC）。 */
+  hostedZoneId: string;
+
+  /** 許可する TXT 完全名（例: _acme-challenge.example.com）。ワイルドカードは指定不可。 */
+  recordNames: string[];
+}
+
 export interface CertificateLambdaProps {
+  /**
+   * DNS-01 変更権限を Zone と TXT 完全名ごとに制限する。
+   * 未指定時は既存配備との互換性のため全 Zone を許可する。
+   * Certbot の Zone 自動探索を上書きする設定ではない。
+   */
+  route53ChallengeZones?: Route53ChallengeZone[];
+
   /**
    * 証明書ストレージ用の S3 バケット
    * Certbot 設定と証明書バックアップを保存
@@ -42,7 +57,7 @@ export interface CertificateLambdaProps {
 
   /**
    * 自動更新のスケジュール式（EventBridge cron）
-   * @default 'cron(0 17 ? * SUN *)' - 毎週日曜日 2:00 JST（UTC 土曜日 17:00）
+   * @default 'cron(0 17 ? * SUN *)' - 毎週月曜日 2:00 JST（UTC 日曜日 17:00）
    */
   scheduleExpression?: string;
 
@@ -93,6 +108,7 @@ export class CertificateLambda extends Construct {
           platform: Platform.LINUX_AMD64, // x86_64 アーキテクチャを使用
         }
       ),
+      reservedConcurrentExecutions: 1, // 同じ S3/Certbot 状態に対する同時更新を防ぐ
       memorySize: 1024, // 1GB メモリ（Certbot 実行に十分）
       timeout: cdk.Duration.minutes(15), // 最大 15 分（Lambda の上限）
       ephemeralStorageSize: cdk.Size.mebibytes(2048), // /tmp に 2GB（Certbot 作業用）
@@ -160,19 +176,71 @@ export class CertificateLambda extends Construct {
       })
     );
 
-    // Route53 ホストゾーン固有の操作権限
-    // DNS-01 チャレンジで TXT レコードを追加/削除
-    this.function.addToRolePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          'route53:ChangeResourceRecordSets', // DNS レコードの変更
-          'route53:GetHostedZone', // ホストゾーン情報の取得
-          'route53:ListResourceRecordSets', // レコードセットのリスト
-        ],
-        resources: ['arn:aws:route53:::hostedzone/*'], // すべてのホストゾーン
-      })
-    );
+    if (props.route53ChallengeZones === undefined) {
+      // 既存配備との互換性を維持する。導入時に明示的に Zone/TXT を限定すること。
+      this.function.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: [
+            'route53:ChangeResourceRecordSets',
+            'route53:GetHostedZone',
+            'route53:ListResourceRecordSets',
+          ],
+          resources: ['arn:aws:route53:::hostedzone/*'],
+        })
+      );
+    } else {
+      if (!Array.isArray(props.route53ChallengeZones) || props.route53ChallengeZones.length === 0) {
+        throw new Error('route53ChallengeZones must be a non-empty array');
+      }
+
+      for (const zone of props.route53ChallengeZones) {
+        if (!zone || typeof zone.hostedZoneId !== 'string' || !/^Z[A-Z0-9]+$/.test(zone.hostedZoneId)) {
+          throw new Error('route53ChallengeZones requires a Hosted Zone ID such as Z1234567890ABC');
+        }
+        if (!Array.isArray(zone.recordNames) || zone.recordNames.length === 0) {
+          throw new Error('route53ChallengeZones requires at least one _acme-challenge record name');
+        }
+        const recordNames = zone.recordNames.map((name) => {
+          if (typeof name !== 'string') {
+            throw new Error('route53ChallengeZones record names must be strings');
+          }
+          const normalized = name.toLowerCase().replace(/[.]$/, '');
+          const labels = normalized.split('.');
+          if (labels[0] !== '_acme-challenge' || labels.length < 2 || normalized.length > 253 ||
+            labels.slice(1).some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) {
+            throw new Error('route53ChallengeZones requires exact _acme-challenge DNS names without wildcards');
+          }
+          return normalized;
+        });
+        const zoneArn = cdk.Stack.of(this).formatArn({
+          service: 'route53',
+          region: '',
+          account: '',
+          resource: 'hostedzone',
+          resourceName: zone.hostedZoneId,
+        });
+
+        this.function.addToRolePolicy(
+          new iam.PolicyStatement({
+            actions: ['route53:GetHostedZone', 'route53:ListResourceRecordSets'],
+            resources: [zoneArn],
+          })
+        );
+        this.function.addToRolePolicy(
+          new iam.PolicyStatement({
+            actions: ['route53:ChangeResourceRecordSets'],
+            resources: [zoneArn],
+            conditions: {
+              'ForAllValues:StringEquals': {
+                'route53:ChangeResourceRecordSetsNormalizedRecordNames': [...new Set(recordNames)],
+                'route53:ChangeResourceRecordSetsRecordTypes': ['TXT'],
+                'route53:ChangeResourceRecordSetsActions': ['UPSERT', 'DELETE'],
+              },
+            },
+          })
+        );
+      }
+    }
 
     // ACM 操作の権限
     // 証明書のインポート、情報取得、タグ付け
@@ -196,7 +264,7 @@ export class CertificateLambda extends Construct {
    * 自動更新用の EventBridge スケジュールを作成
    *
    * 指定された cron 式に基づいて Lambda 関数を定期実行する。
-   * デフォルトは毎週日曜日 2:00 JST（UTC 土曜日 17:00）。
+   * デフォルトは毎週月曜日 2:00 JST（UTC 日曜日 17:00）。
    *
    * @param scheduleExpression - EventBridge cron 式
    * @param stackNameSuffix - スタック名サフィックス

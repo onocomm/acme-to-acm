@@ -6,3 +6,8 @@ tsconfig.json
 .gitignore
 README.md
 *.md
+.env
+.env.*
+*.pem
+*.key
+*.log

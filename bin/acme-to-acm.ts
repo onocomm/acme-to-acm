@@ -22,6 +22,13 @@ const app = new cdk.App();
 // 複数スタックをデプロイする場合に使用（例: STACK_SUFFIX=-jprs, STACK_SUFFIX=-letsencrypt）
 const stackSuffix = process.env.STACK_SUFFIX || '';
 
+// -c route53ChallengeZones='[{"hostedZoneId":"Z1234567890ABC","recordNames":["_acme-challenge.example.com"]}]'
+// または cdk.json の context で配列を設定する。未指定は既存権限を維持する。
+const route53Context = app.node.tryGetContext('route53ChallengeZones');
+const route53ChallengeZones = typeof route53Context === 'string'
+  ? JSON.parse(route53Context)
+  : route53Context;
+
 // ACME to ACM スタックを作成してデプロイ
 new AcmeToAcmStack(app, `AcmeToAcmStack${stackSuffix}`, {
   /**
@@ -52,11 +59,11 @@ new AcmeToAcmStack(app, `AcmeToAcmStack${stackSuffix}`, {
   /**
    * 自動更新スケジュール式（EventBridge cron）
    *
-   * デフォルト: 毎週日曜日 2:00 JST（UTC 土曜日 17:00）
+   * デフォルト: 毎週月曜日 2:00 JST（UTC 日曜日 17:00）
    * EventBridge cron 構文を使用してカスタマイズ可能
    *
    * 例:
-   * - 'cron(0 17 ? * SUN *)' - 毎週日曜日 2:00 JST
+   * - 'cron(0 17 ? * SUN *)' - 毎週月曜日 2:00 JST
    * - 'cron(0 3 1 * ? *)' - 毎月 1 日 12:00 JST
    * - 'cron(0 0 ? * MON-FRI *)' - 毎平日 9:00 JST
    */
@@ -90,4 +97,5 @@ new AcmeToAcmStack(app, `AcmeToAcmStack${stackSuffix}`, {
    * 複数スタックを同一アカウントにデプロイする場合に使用
    */
   stackNameSuffix: stackSuffix,
+  route53ChallengeZones,
 });

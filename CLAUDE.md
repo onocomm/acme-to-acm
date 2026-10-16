@@ -53,7 +53,7 @@ The system operates in three distinct modes based on Lambda event payload:
    - Newly obtained certificates are automatically added to renewal rotation
 
 3. **renew mode**: Automated renewal based on domains.json configuration
-   - Weekly EventBridge trigger (default: Sunday 2AM JST)
+   - Weekly EventBridge trigger (default: Monday 2AM JST)
    - Reads certificate list from S3 `config/domains.json`
    - Only renews certificates approaching expiration (configurable threshold)
    - Primary operational mode after initial setup
@@ -120,19 +120,19 @@ This project uses `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 
 
 1. **Equal Treatment of Runtimes**: Both Node.js and Python are explicitly installed dependencies, avoiding implicit bias toward one runtime over the other
 2. **OpenSSL Compatibility**: Runtime-specific images (especially nodejs) may use `openssl-snapsafe-libs` which is incompatible with Certbot's cryptography package requirements
-3. **Explicit Dependency Management**: All dependencies (Node.js 22, Python 3.13, Certbot) are clearly visible in the Dockerfile
+3. **Explicit Dependency Management**: All dependencies (Node.js 24, Python 3.13, Certbot) are clearly visible in the Dockerfile
 4. **Custom Runtime Control**: Full control over runtime versions and Lambda Runtime Interface Client configuration
 
 **Critical Constraint**: **DO NOT** change the base image to `python:3.13`, `nodejs:22`, or any other runtime-specific image, even if deployment or installation errors occur. Troubleshoot within the provided:al2023 context instead.
 
 **Technical Implementation**:
 - Base: `public.ecr.aws/lambda/provided:al2023`
-- Node.js Runtime: Installed via dnf (Node.js 22)
+- Node.js Runtime: Installed via dnf (nodejs24/nodejs24-npm), major=24 checked at build time
 - Python Runtime: Installed via dnf (Python 3.13)
 - Build Tools: cmake, gcc, gcc-c++, make, tar, xz, autoconf, automake, libtool
 - Lambda RIC: `aws-lambda-ric` npm package for custom Node.js runtime
 - Handler: TypeScript (compiled to `dist/index.handler`)
-- ENTRYPOINT: `/usr/bin/npx aws-lambda-ric`
+- ENTRYPOINT: `/usr/local/bin/acme-entrypoint` (CMD → `_HANDLER`, then Node24/RIC)
 - CMD: `dist/index.handler`
 - **NPM Cache**: `ENV NPM_CONFIG_CACHE=/tmp/.npm` (required for npm@8.6.0+ in read-only Lambda filesystem)
 
@@ -173,7 +173,7 @@ All Certbot commands use `execFileSync` (not `execSync`) to prevent command inje
 
 **Dockerfile** (`lambda/Dockerfile`)
 - Base: `public.ecr.aws/lambda/provided:al2023` (OS-only Amazon Linux 2023 image)
-- Installs both Node.js 22 and Python 3.13 as equal dependencies
+- Installs both Node.js 24 and Python 3.13 as equal dependencies
 - Installs Certbot and certbot-dns-route53 via pip
 - Uses AWS Lambda Runtime Interface Client (RIC) for custom Node.js runtime
 - Copies compiled TypeScript from `lambda/dist/`
@@ -417,7 +417,7 @@ aws logs tail /aws/lambda/AcmeToAcmCertificateRenewer \
 
 **Symptom**: `Runtime.InvalidEntrypoint` or `ProcessSpawnFailed`
 - **Cause**: ENTRYPOINT misconfiguration in Dockerfile
-- **Solution**: Verify ENTRYPOINT is `/usr/bin/npx aws-lambda-ric` and CMD is `dist/index.handler`
+- **Solution**: Verify ENTRYPOINT is `/usr/local/bin/acme-entrypoint` (sets `_HANDLER` and execs Node24/RIC) and CMD is `dist/index.handler`
 
 **Symptom**: `EROFS: read-only file system, mkdir '/home/sbx_user1051'`
 - **Cause**: npm/npx attempting to write cache to read-only home directory
@@ -507,7 +507,7 @@ Certbot's Route53 plugin uses AWS SDK credentials from Lambda execution role aut
 ## EventBridge Schedule
 
 Weekly trigger configured in `lib/constructs/certificate-lambda.ts`:
-- Default: `cron(0 17 ? * SUN *)` (Sunday 17:00 UTC = Sunday 02:00 JST)
+- Default: `cron(0 17 ? * SUN *)` (Sunday 17:00 UTC = Monday 02:00 JST)
 - Payload: `{mode: "renew"}`
 - Customize via `scheduleExpression` prop in `bin/acme-to-acm.ts`
 - Disable via `enableSchedule: false`
@@ -524,3 +524,7 @@ JPRS requires three-step workflow:
 EAB credentials are invalidated by JPRS after successful registration - do not attempt to reuse.
 
 **Important**: After certonly mode successfully obtains a certificate, it is automatically added to domains.json in S3. Manual editing of domains.json is optional - certonly mode handles the configuration lifecycle.
+
+## Issue #2 safety and migration
+
+See `docs/issue-2-validation.md` for validation, conditional configuration writes, bucket-wide state locks, state snapshots, Route53 constraints and rollback. Never log entire input events, external errors, Certbot output or EAB arguments. `dryRun` skips issuance/import but still performs S3 sync and SNS notification. Check response `statusCode`, `totalFailed` and individual results; invocation HTTP 200 alone is insufficient.

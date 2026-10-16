@@ -11,7 +11,8 @@
     "cdk": "cdk",
     "build:lambda": "cd lambda && npm run build",
     "test": "jest",
-    "postinstall": "cd lambda && npm install",
+    "postinstall": "npm ci --prefix lambda --ignore-scripts",
+    "test:runtime": "node scripts/verify-runtime.mjs",
     "deploy": "npm run build && cdk deploy",
     "synth": "npm run build && cdk synth",
     "diff": "npm run build && cdk diff"
@@ -30,9 +31,12 @@
   ],
   "author": "Onocom Co., Ltd.",
   "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.12",
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "aws-cdk": "^2.1125.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.0",
